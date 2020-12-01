@@ -221,11 +221,11 @@ def rpms_output_to_terminal(rpm_summary, rpm_info):
     console.print("RPMs may be built by SUSE: ", str(rpm_summary['build_by_suse']), style = "bold green")
     console.print("RPMs don't support external flag in their kernel models: ", str(rpm_summary['no_external_flag']), style = "bold red")
 
-    table = Table(show_header=True, header_style="bold green")
-    table.add_column("Name")
-    table.add_column("Vendor")
-    table.add_column("Signature")
-    table.add_column("Distribution")
+    table = Table(show_header=True, header_style="bold green", show_lines=True)
+    table.add_column("Name", width=64)
+    table.add_column("Vendor", width=12)
+    table.add_column("Signature", width=28)
+    table.add_column("Distribution", width=12)
     table.add_column("Driver Support Status")
     for rpm in rpm_info:
         driver_support_status = ''
@@ -321,11 +321,11 @@ def rpm_output_to_html(name, base_info, ko_external_flag, outputhtml):
 def rpm_output_to_terminal(name, basic_info, ko_external_flag):
     console = Console()
 
-    table = Table(show_header=True, header_style="bold green")
-    table.add_column("Name")
-    table.add_column("Vendor")
-    table.add_column("Signature")
-    table.add_column("Distribution")
+    table = Table(show_header=True, header_style="bold green", show_lines=True)
+    table.add_column("Name", width=64)
+    table.add_column("Vendor", width=12)
+    table.add_column("Signature", width=28)
+    table.add_column("Distribution", width=12)
     table.add_column("Driver Support Status")
     driver_support_status = ''
     for support_type, kos in ko_external_flag.items():
@@ -375,7 +375,7 @@ def drivers_output_to_html(sys_driver_info, outputhtml):
 def drivers_output_to_terminal(sys_driver_info):
     console = Console()
 
-    table = Table(show_header=True, header_style="bold green")
+    table = Table(show_header=True, header_style="bold green", show_lines=True)
     table.add_column("Name")
     table.add_column("Support Status")
     for d in sys_driver_info:
@@ -405,7 +405,7 @@ def check_all_system_drivers():
 if __name__ == "__main__":
     path, file, outputhtml, system = parameter_checks()
 
-    if system != None:
+    if system == True:
         driver_info = check_all_system_drivers()
         if outputhtml != None:
             drivers_output_to_html(driver_info, outputhtml)
@@ -423,5 +423,3 @@ if __name__ == "__main__":
             rpm_output_to_html(Path(file).name, base_info, ko_external_flag, outputhtml)
         else:
             rpm_output_to_terminal(Path(file).name, base_info, ko_external_flag)
-
-
