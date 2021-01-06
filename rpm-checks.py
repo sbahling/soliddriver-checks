@@ -20,15 +20,72 @@ def check_base_info(package):
     for line in rpm_qpi.stdout.readlines():
         if line.startswith(b'Signature'):
             sig = str(line)
+            sig = sig[0:len(sig) - 3]
             baseinfo['signature'] = sig[sig.find(':') + 1:]
         if line.startswith(b'Distribution'):
             dis = str(line)
+            dis = dis[0:len(dis) - 3]
             baseinfo['distribution'] = dis[dis.find(':') + 1:]
         if line.startswith(b'Vendor'):
             ven = str(line)
+            ven = ven[0:len(ven) - 3]
             baseinfo['vendor'] = ven[ven.find(':') + 1:]
     
     return baseinfo
+
+def get_rpm_from_driver(driver):
+    command = 'rpm -qf %s' % driver
+    command = shlex.split(command)
+    rpm_info = subprocess.Popen(command, stdout=subprocess.PIPE)
+    rpm_info.wait()
+
+    info = str(rpm_info.stdout.readlines())
+    info = info[3:len(info)-4]
+    if "is not owned by any package" in info:
+        return False, info
+    else:
+        return True, info
+
+class DriverInfo:
+    def __init__(self, name, path, ko_external_flag, running, foundRPM, rpm_name):
+        self.name = name
+        self.path = path
+        self.ko_external_flag = ko_external_flag
+        self.running = running
+        self.foundRPM = foundRPM
+        self.rpm_name = rpm_name
+
+
+def check_installed_drivers():
+    command = 'find /lib/modules/ -name "*.ko"'
+    command = shlex.split(command)
+    rpm_kos = subprocess.Popen(command, stdout=subprocess.PIPE)
+    rpm_kos.wait()
+
+    drivers_running = get_all_running_drivers()
+    drivers_running_files = []
+    for driver in drivers_running:
+        drivers_running_files.append(get_running_driver_path(driver))
+
+    kos_info = []
+    for line in rpm_kos.stdout.readlines():
+        driver = str(line)
+        driver = driver[2:len(driver) - 3]
+        found, info = get_rpm_from_driver(driver)
+        running = driver in drivers_running_files
+        if running is True:
+            drivers_running_files.remove(driver)
+        ko_external_flag = check_external_flag(driver)
+
+        kos_info.append(DriverInfo(Path(driver).name, driver, ko_external_flag, running, found, info))
+    
+    for driver in drivers_running_files:
+        found, info = get_rpm_from_driver(driver)
+        ko_external_flag = check_external_flag(driver)
+
+        kos_info.append(DriverInfo(Path(driver).name, driver, ko_external_flag, True, found, info))
+    
+    return kos_info
 
 
 def check_buildflags(package):
@@ -133,7 +190,8 @@ def parameter_checks():
     parser = argparse.ArgumentParser(usage = usage, description = description)
     parser.add_argument('-d', '--dir', dest="dir", help="rpms in this dirctory")
     parser.add_argument('-f', '--file', dest="file", help="rpm file")
-    parser.add_argument('-s', '--system', action='store_true', help="check drivers in the system")
+    parser.add_argument('-s', '--system', action='store_true', help="check drivers running in the system")
+    parser.add_argument('-i', '--installed', action='store_true', help="check drivers installed in the system")
     parser.add_argument('-oh', '--output-html', dest="outputhtml", help="output to html file")
     args = parser.parse_args()
     if args.dir != None:
@@ -148,7 +206,7 @@ def parameter_checks():
         parser.print_help()
         exit(1)
     
-    return args.dir, args.file, args.outputhtml, args.system
+    return args.dir, args.file, args.outputhtml, args.system, args.installed
 
 
 def rpms_output_to_html(rpm_summary, rpm_info, outputhtml):
@@ -194,11 +252,11 @@ def rpms_output_to_html(rpm_summary, rpm_info, outputhtml):
         row = row + "<td>" + rpm.name + "</td>" + "<td>" + rpm.base_info['vendor'] + "</td>" + "<td>" + rpm.base_info['signature'] + "</td>" + "<td>" + rpm.base_info['distribution'] + "</td>"
         row = row + "<td>"
         for support_type, kos in rpm.ko_external_flag.items():
-            if support_type == "external":
+            if support_type == "external" and len(kos) > 0:
                 row = row + "Supported by both SUSE and the vendor:"
-            elif support_type == "suse_build":
+            elif support_type == "suse_build" and len(kos) > 0:
                 row = row + "Supported by SUSE:"
-            elif support_type == "unknow":
+            elif support_type == "unknow" and len(kos) > 0:
                 row = row + "Not supported by SUSE:"
             row = row + "</br>"
             for ko in kos:
@@ -230,11 +288,11 @@ def rpms_output_to_terminal(rpm_summary, rpm_info):
     for rpm in rpm_info:
         driver_support_status = ''
         for support_type, kos in rpm.ko_external_flag.items():
-            if support_type == "external":
+            if support_type == "external" and len(kos) > 0:
                 driver_support_status = driver_support_status + "Supported by both SUSE and the vendor:\n"
-            elif support_type == "suse_build":
+            elif support_type == "suse_build" and len(kos) > 0:
                 driver_support_status = driver_support_status + "Supported by SUSE:\n"
-            elif support_type == "unknow":
+            elif support_type == "unknow" and len(kos) > 0:
                 driver_support_status = driver_support_status + "Not supported by SUSE:\n"
             for ko in kos:
                 driver_support_status = driver_support_status + "\t" + ko +  "\n"
@@ -297,11 +355,11 @@ def rpm_output_to_html(name, base_info, ko_external_flag, outputhtml):
     row = row + "<td>" + name + "</td>" + "<td>" + base_info['vendor'] + "</td>" + "<td>" + base_info['signature'] + "</td>" + "<td>" + base_info['distribution'] + "</td>"
     row = row + "<td>"
     for support_type, kos in ko_external_flag.items():
-        if support_type == "external":
+        if support_type == "external" and len(kos) > 0:
             row = row + "Supported by both SUSE and the vendor:"
-        elif support_type == "suse_build":
+        elif support_type == "suse_build" and len(kos) > 0:
             row = row + "Supported by SUSE:"
-        elif support_type == "unknow":
+        elif support_type == "unknow" and len(kos) > 0:
             row = row + "Not supported by SUSE:"
         row = row + "</br>"
         for ko in kos:
@@ -329,11 +387,11 @@ def rpm_output_to_terminal(name, basic_info, ko_external_flag):
     table.add_column("Driver Support Status")
     driver_support_status = ''
     for support_type, kos in ko_external_flag.items():
-        if support_type == "external":
+        if support_type == "external" and len(kos) > 0:
             driver_support_status = driver_support_status + "Supported by both SUSE and the vendor:\n"
-        elif support_type == "suse_build":
+        elif support_type == "suse_build" and len(kos) > 0:
             driver_support_status = driver_support_status + "Supported by SUSE:\n"
-        elif support_type == "unknow":
+        elif support_type == "unknow" and len(kos) > 0:
             driver_support_status = driver_support_status + "Not supported by SUSE:\n"
         for ko in kos:
             driver_support_status = driver_support_status + "\t" + ko +  "\n"
@@ -356,7 +414,21 @@ def rpm_output_to_terminal(name, basic_info, ko_external_flag):
     
     console.print(table)
 
-def get_all_system_drivers():
+def get_running_driver_path(driver):
+    command = '/usr/sbin/modinfo %s' % driver
+    command = shlex.split(command)
+    info = subprocess.Popen(command, stdout=subprocess.PIPE)
+    info.wait()
+    for line in info.stdout.readlines():
+        if line.startswith(b'filename:'):
+            file_name = str(line)
+            file_name = file_name[file_name.find(":") + 1:len(file_name)-3]
+
+            return file_name.lstrip()
+    
+    return ""
+
+def get_all_running_drivers():
     command = 'cat /proc/modules | awk \'{print $1}\''
     drivers = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, 
                                                     stderr=subprocess.PIPE)
@@ -393,8 +465,8 @@ class SystemDriverInfo:
         self.name = name
         self.external_flag = external_flag
 
-def check_all_system_drivers():
-    drivers = get_all_system_drivers()
+def check_all_running_drivers():
+    drivers = get_all_running_drivers()
 
     driver_info = []
     for driver in drivers:
@@ -402,11 +474,50 @@ def check_all_system_drivers():
     
     return driver_info
 
+def get_external_flag_cell(external_flag):
+    if external_flag == "external":
+        return "[blue]Is supported by both SUSE and the vendor[/blue]"
+    elif external_flag == "suse_build":
+        return "[green]Is supported by SUSE[/green]"
+    elif external_flag == "unknow":
+        return "[red]Is not supported by SUSE[/red]"
+
+    return "[red]Don't have support flag[/red]"
+
+def get_rpm_info_cell(foundRPM, rpm_name):
+    if foundRPM is True:
+        return "[green]" + rpm_name + "[/green]"
+    else:
+        return "[red]" + rpm_name + "[/red]"
+
+def installed_drivers_to_terminal(drivers):
+    console = Console()
+
+    table = Table(show_header=True, header_style="bold green", show_lines=True)
+    table.add_column("Name")
+    table.add_column("Path")
+    table.add_column("External Flag")
+    table.add_column("Running")
+    table.add_column("RPM info")
+
+    for driver in drivers:
+        supported = get_external_flag_cell(driver.ko_external_flag)
+        rpm_info = get_rpm_info_cell(driver.foundRPM, driver.rpm_name)
+        running = "False"
+        if driver.running is True:
+            running = "True"
+        table.add_row(driver.name, driver.path, supported, running, rpm_info)
+    
+    console.print(table)
+
+def installed_drivers_to_html(drivers, path):
+    exit(1)
+
 if __name__ == "__main__":
-    path, file, outputhtml, system = parameter_checks()
+    path, file, outputhtml, system, installed = parameter_checks()
 
     if system == True:
-        driver_info = check_all_system_drivers()
+        driver_info = check_all_running_drivers()
         if outputhtml != None:
             drivers_output_to_html(driver_info, outputhtml)
         else:
@@ -423,3 +534,9 @@ if __name__ == "__main__":
             rpm_output_to_html(Path(file).name, base_info, ko_external_flag, outputhtml)
         else:
             rpm_output_to_terminal(Path(file).name, base_info, ko_external_flag)
+    elif installed != None:
+        drivers = check_installed_drivers()
+        if outputhtml != None:
+            installed_drivers_to_html(drivers, outputhtml)
+        else:
+            installed_drivers_to_terminal(drivers)
