@@ -1,9 +1,6 @@
 from rich.console import Console
 from rich.table import Column, Table
 import pandas as pd
-from jinja2 import Environment, ChoiceLoader, FileSystemLoader
-from IPython.display import HTML
-from pandas.io.formats.style import Styler
 
 
 def rpms_export_to_terminal(df):
