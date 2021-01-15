@@ -2,6 +2,7 @@ import parameters
 from utils import input_data
 from utils import analysis
 from utils import export
+from utils import remote_check
 
 if __name__ == "__main__":
     args = parameters.parameter_parse()
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     elif args.rpm != None:
         df = analysis.analysisRPM(args.rpm)
         print(df)
-    elif args.system != None:
+    elif args.system:
         df = analysis.analysisOS()
 
         if args.query == 'suse':
@@ -48,5 +49,7 @@ if __name__ == "__main__":
             export.os_export_to_excel(df, args.file)
     elif args.driver != None:
         driver_support_flag, running, found, rpm_info = analysis.analysis_driver(args.driver)
-
+    elif args.remote != None:
+        servers = remote_check.get_remote_server_config(args.remote)
+        remote_check.check_remote_servers(servers)
 

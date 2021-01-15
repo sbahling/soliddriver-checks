@@ -34,7 +34,7 @@ def set_rpm_format_for_html(column):
     
     return "background-color: white"
 
-def get_html_render_styles():
+def get_table_render_styles():
     styles = [
         dict(selector='table', props=[('border', '1px solid green'), 
                                       ('border-collapse', 'collapse')]),
@@ -54,7 +54,7 @@ def rpms_export_to_html(df, file):
     df["Driver Support Status"] = df["Driver Support Status"].str.replace('\t', '&nbsp&nbsp&nbsp&nbsp')
     s = df.style.applymap(set_rpm_format_for_html, subset = pd.IndexSlice[:, ['Driver Support Status']]).hide_index()
 
-    styles = get_html_render_styles()
+    styles = get_table_render_styles()
 
     s = s.set_table_styles(styles)
 
@@ -156,7 +156,7 @@ def os_export_to_html(df, file):
     s = s.applymap(set_drivers_running_format_for_html, subset = pd.IndexSlice[:, ['Running']])
     s = s.applymap(set_drivers_rpm_info_format_for_html, subset = pd.IndexSlice[:, ['RPM Information']]).hide_index()
 
-    styles = get_html_render_styles()
+    styles = get_table_render_styles()
     
     s = s.set_table_styles(styles)
 
