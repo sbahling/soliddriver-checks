@@ -1,9 +1,9 @@
-import command_process
+from utils import command_process
 import pandas as pd
 from pathlib import Path
 
 class RPMChecks:
-    def Analysis(self, path):
+    def __init__(self):
         self.cmdProcess = command_process.LocalCmdProcess()
 
     def get_suse_support_rpms(self, rpms):
@@ -25,11 +25,11 @@ class RPMChecks:
                             "Distribution":[],
                             "Driver Support Status":[]})
         
-        rpm_files = self.cmdProcess.get_rpms_from_dir(path)
+        rpm_files = self.cmdProcess.get_rpms_from_dir(path=path)
 
         for rpm in rpm_files:
             name, signature, distribution, vendor, driver_support_flags = self.analysisRPM(rpm)
-            dsf = self.cmdProcess.driver_support_flags_to_string(driver_support_flags)
+            dsf = self.driver_support_flags_to_string(driver_support_flags)
             new_row = {'Name':name, 
                     'Vendor':vendor,
                     'Signature':signature,
@@ -78,6 +78,7 @@ class DriverChecks:
             self.cmdProcess = command_process.LocalCmdProcess()
         else:
             self.cmdProcess = command_process.SSHCmdProcess(ip, user, password, ssh_port)
+            self.cmdProcess.connect()
         
         self.driver_df = pd.DataFrame({"Name":[],
                                  "Path":[],
@@ -111,7 +112,7 @@ class DriverChecks:
             else:
                 running = "False"
         
-            _, rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
+            rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
 
             new_row = {'Name':Path(driver).name, 
                    'Path':driver,
@@ -124,7 +125,7 @@ class DriverChecks:
             if driver.startswith('/lib/modules') is False:
                 driver_support_flag = self.cmdProcess.check_support_flag(driver)
                 running = True
-                _, rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
+                rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
                 new_row = {'Name':Path(driver).name, 
                    'Path':driver,
                    'Support Flag': driver_support_flag,
@@ -151,6 +152,6 @@ class DriverChecks:
     
         driver_support_flag = self.cmdProcess.check_support_flag(path)
         running = driver in drivers_running_files
-        found, rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
+        rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
 
-        return driver_support_flag, running, found, rpm_info
+        return driver_support_flag, running, rpm_info

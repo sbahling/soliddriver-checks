@@ -209,3 +209,19 @@ def os_export_to_excel(df, file):
                                         'format': red_format})
 
     writer.save()
+
+def remote_export_to_terminal(driver_collections):
+    console = Console()
+    for server in driver_collections:
+        console.print(server + ' Checking result:')
+        os_export_to_terminal(driver_collections[server])
+
+
+def remote_export_to_html(driver_collections, file):
+    pass
+
+def remote_export_to_pdf(driver_collections, file):
+    pass
+
+def remote_export_to_excel(driver_collections, file):
+    pass

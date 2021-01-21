@@ -15,7 +15,7 @@ def get_cmd_running_drivers():
 def get_cmd_running_driver_path(driver):
     return '/usr/sbin/modinfo %s' % driver
     
-def get_cmd__rpm_from_driver(driver):
+def get_cmd_rpm_from_driver(driver):
     return 'rpm -qf %s' % driver
     
 def get_cmd_modinfo_cmd(driver):
@@ -39,56 +39,28 @@ class CmdProcess:
     def get_running_driver_path(self) -> str:
         pass
 
-    def get_rpm_from_driver(self, driver: str) -> bool, str:
+    def get_rpm_from_driver(self, driver: str) -> str:
         pass
 
     def check_support_flag(self, driver: str) -> str:
         pass
 
     def format_driver_list(self, drivers) -> []:
-        drivers = drivers.split(b'\n')
-        drivers = drivers[0:len(driver_list) - 1]
-
-        driver_list = []
-        for driver in drivers:
-            driver = str(driver).lstrip().rstrip()
-            driver = driver[2:len(driver) - 1]
-            driver_list.append(driver)
-        
-        return driver_list
+        pass
     
     def format_driver_path_from_modinfo(self, modeinfo) -> str:
-        for line in modeinfo:
-            if line.startswith(b'filename:'):
-                file_name = str(line)
-                file_name = file_name[file_name.find(":") + 1:len(file_name)-3]
-
-                return file_name.lstrip()
+        pass
     
-        return ""
-    
-    def format_rpm_name(self, rawresult) -> bool, str:
-        info = str(rawresult)
-        info = info[2:len(info) - 3]
-        if "is not owned by any package" in info:
-            return False, info
-        else:
-            return True, info
+    def format_rpm_name(self, rawresult) -> str:
+        pass
+        
     
     def format_support_flag(self, rawresult) -> dict:
-        rpminfo = rawresult.split(b'\n')
-
-        flag = 'N/A'
-        for line in rpminfo:
-            if line.startswith(b'supported:'):
-                flag = str(line)
-                flag = flag[len('supported:')+2:len(flag) - 1].rstrip().lstrip()
-    
-        return flag
+        pass
 
 
 class LocalCmdProcess(CmdProcess):
-    def format_rpm_basic_info(self, rawresult) -> str, str, str:
+    def format_rpm_basic_info(self, rawresult) -> (str, str, str):
         signature = ''
         distribution = ''
         vendor = ''
@@ -118,66 +90,71 @@ class LocalCmdProcess(CmdProcess):
     
         return rpms
 
-    @CmdProcess.get_os_drivers
     def get_os_drivers(self) -> []:
         """Get all drivers under /lib/modules/"""
         command = get_cmd_os_drivers()
         cmd_driver = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, 
                                                     stderr=subprocess.PIPE)
         drivers, errs = cmd_driver.communicate()
-        driver_list = super().format_driver_list(drivers)
+        driver_list = self.format_driver_list(drivers)
 
         return driver_list
 
-    @CmdProcess.get_running_drivers
     def get_running_drivers(self) -> []:
         """Get all running drivers"""
         command = get_cmd_running_drivers()
         drivers = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, 
                                                     stderr=subprocess.PIPE)
         drivers, errs = drivers.communicate()
-        driver_list = super().format_driver_list(drivers)
+        driver_list = self.format_driver_list(drivers)
         
         return driver_list
 
-    @CmdProcess.get_running_driver_path
     def get_running_driver_path(self, driver) -> str:
         command = get_cmd_modinfo_cmd(driver)
         command = shlex.split(command)
         info = subprocess.Popen(command, stdout=subprocess.PIPE)
         info.wait()
 
-        driver_path = super().format_driver_path_from_modinfo(info.stdout.readlines())
+        driver_path = self.format_driver_path_from_modinfo(info.stdout.readlines())
         
         return driver_path
 
-    @CmdProcess.get_rpm_from_driver
-    def get_rpm_from_driver(self, driver: str) -> bool, str:
-        command = get_cmd__rpm_from_driver(driver)
+    def get_rpm_from_driver(self, driver: str) -> str:
+        command = get_cmd_rpm_from_driver(driver)
         command = shlex.split(command)
         rpm_info = subprocess.Popen(command, stdout=subprocess.PIPE)
         info, errs = rpm_info.communicate()
     
-        return super().format_rpm_name(info)
+        return self.format_rpm_name(info)
 
-    @CmdProcess.check_support_flag
     def check_support_flag(self, driver: str) -> str:
         command = get_cmd_modinfo_cmd(driver)
         command = shlex.split(command)
         support_flag = subprocess.Popen(command, stdout=subprocess.PIPE)
         rpminfo, errs = support_flag.communicate()
-        flag = super().format_support_flag(rpminfo)
+        flag = self.format_support_flag(rpminfo)
 
         return flag
 
-    def get_basic_info_from_rpm(self, rpm: str) -> str, str, str, str:
+    def check_support_flags(self, drivers):
+        drivers_support_flag = dict()
+        drivers_support_flag["external"] = []
+        drivers_support_flag["yes"] = []
+        drivers_support_flag["N/A"] = []
+        for driver in drivers:
+            drivers_support_flag[self.check_support_flag(driver)].append(str(driver))
+    
+        return drivers_support_flag
+
+    def get_basic_info_from_rpm(self, rpm: str) -> (str, str, str, str):
         command = get_cmd_rpm_info(rpm)
         command = shlex.split(command)
         rpm_qpi = subprocess.Popen(command, stdout=subprocess.PIPE)
         rpm_qpi.wait()
 
         name = os.path.basename(rpm)
-        signature, distribution, vendor = super().format_rpm_basic_info(rpm_qpi.stdout.readlines())
+        signature, distribution, vendor = self.format_rpm_basic_info(rpm_qpi.stdout.readlines())
     
         return name, signature, distribution, vendor
 
@@ -198,12 +175,57 @@ class LocalCmdProcess(CmdProcess):
 
             return None
 
-        driver_support_flags = check_support_flags(drivers)
+        driver_support_flags = self.check_support_flags(drivers)
 
         os.chdir('../')
         shutil.rmtree('tmp')
 
         return driver_support_flags
+    
+    def format_driver_list(self, drivers) -> []:
+        drivers = drivers.split(b'\n')
+        drivers = drivers[0:len(drivers) - 1]
+
+        driver_list = []
+        for driver in drivers:
+            driver = str(driver).lstrip().rstrip()
+            driver = driver[2:len(driver) - 1]
+            driver_list.append(driver)
+        
+        return driver_list
+    
+    def format_driver_path_from_modinfo(self, modeinfo) -> str:
+        for line in modeinfo:
+            if line.startswith(b'filename:'):
+                file_name = str(line)
+                file_name = file_name[file_name.find(":") + 1:len(file_name)-3]
+
+                return file_name.lstrip()
+    
+        return ""
+    
+    def format_rpm_name(self, rawresult) -> str:
+        info = str(rawresult)
+        info = info[2:len(info) - 3]
+
+        # if "is not owned by any package" in info:
+        #     return False, info
+        # else:
+        #     return True, info
+
+        return info
+        
+    
+    def format_support_flag(self, rawresult) -> dict:
+        rpminfo = rawresult.split(b'\n')
+
+        flag = 'N/A'
+        for line in rpminfo:
+            if line.startswith(b'supported:'):
+                flag = str(line)
+                flag = flag[len('supported:')+2:len(flag) - 1].rstrip().lstrip()
+    
+        return flag
 
 
 class SSHCmdProcess(CmdProcess):
@@ -218,47 +240,87 @@ class SSHCmdProcess(CmdProcess):
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(hostname=self.ip, username=self.user, password=self.password, port=self.ssh_port)
 
-    @CmdProcess.get_os_drivers
     def get_os_drivers(self) -> []:
         """Get all drivers under /lib/modules/"""
         command = get_cmd_os_drivers()
         stdin, stdout, stderr = self.ssh.exec_command(command)
         drivers = stdout.readlines()
-        driver_list = super().format_driver_list(drivers)
+        driver_list = self.format_driver_list(drivers)
 
         return driver_list
 
-    @CmdProcess.get_running_drivers
     def get_running_drivers(self) -> []:
         """Get all running drivers"""
         command = get_cmd_running_drivers()
         stdin, stdout, stderr = self.ssh.exec_command(command)
         drivers = stdout.readlines()
-        driver_list = super().format_driver_list(drivers)
+        driver_list = self.format_driver_list(drivers)
         
         return driver_list
 
-    @CmdProcess.get_running_driver_path
-    def get_running_driver_path(self) -> str:
+    def get_running_driver_path(self, driver: str) -> str:
         command = get_cmd_modinfo_cmd(driver)
         stdin, stdout, stderr = self.ssh.exec_command(command)
-
-        driver_path = super().format_driver_path_from_modinfo(stdout.readlines())
+        drivers = stdout.readlines()
         
-        return driver_path
+        return self.format_driver_path_from_modinfo(drivers)
 
-    @CmdProcess.get_rpm_from_driver
-    def get_rpm_from_driver(self, driver: str) -> bool, str:
-        command = get_cmd__rpm_from_driver(driver)
+    def get_rpm_from_driver(self, driver: str) -> str:
+        command = get_cmd_rpm_from_driver(driver)
         stdin, stdout, stderr = self.ssh.exec_command(command)
+        rpm_info = stdout.readlines()
     
-        return super().format_rpm_name(stdout)
+        return self.format_rpm_name(rpm_info[0])
 
-    @CmdProcess.check_support_flag
     def check_support_flag(self, driver: str) -> str:
         command = get_cmd_modinfo_cmd(driver)
         stdin, stdout, stderr = self.ssh.exec_command(command)
-        flag = super().format_support_flag(stdout)
+        flag = stdout.readlines()
+        flag = self.format_support_flag(flag)
 
+        return flag
+    
+    def format_driver_list(self, drivers) -> []:
+        # drivers = drivers.split(b'\n')
+        drivers = drivers[0:len(drivers) - 1]
+
+        driver_list = []
+        for driver in drivers:
+            driver = str(driver).lstrip().rstrip()
+            driver_list.append(driver)
+        
+        return driver_list
+    
+    def format_driver_path_from_modinfo(self, modeinfo) -> str:
+        for line in modeinfo:
+            if line.startswith('filename:'):
+                file_name = str(line)
+                file_name = file_name[file_name.find(":") + 1:len(file_name)]
+
+                return file_name.lstrip()
+    
+        return ""
+    
+    def format_rpm_name(self, rawresult) -> str:
+        info = str(rawresult)
+        info = info[:len(info) - 1]
+
+        # if "is not owned by any package" in info:
+        #     return False, info
+        # else:
+        #     return True, info
+
+        return info
+        
+    
+    def format_support_flag(self, rawresult) -> dict:
+        # rpminfo = rawresult.split(b'\n')
+
+        flag = 'N/A'
+        for line in rawresult:
+            if line.startswith('supported:'):
+                flag = str(line)
+                flag = flag[len('supported:')+2:len(flag) - 1].rstrip().lstrip()
+    
         return flag
 
