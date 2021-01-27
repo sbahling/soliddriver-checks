@@ -4,6 +4,7 @@ from utils import analysis
 from utils import export
 from utils import remote_check
 from utils import checks
+import os
 
 if __name__ == "__main__":
     args = parameters.parameter_parse()
@@ -35,7 +36,9 @@ if __name__ == "__main__":
         elif args.output == 'pdf':
             export.os_export_to_pdf(check_result, args.file)
         elif args.output == 'excel':
-            export.os_export_to_excel(check_result, args.file)
+            result = dict()
+            result['Solid Driver Checks'] = check_result
+            export.os_export_to_excel(result, args.file)
     elif args.driver != None:
         driver_support_flag, running, found, rpm_info = analysis.analysis_driver(args.driver)
     elif args.remote != None:
@@ -49,6 +52,8 @@ if __name__ == "__main__":
         elif args.output == 'pdf':
             export.remote_export_to_pdf(check_result, args.file)
         elif args.output == 'excel':
+            if os.path.exists(args.file):
+                os.remove(args.file)
             export.remote_export_to_excel(check_result, args.file)
 
 

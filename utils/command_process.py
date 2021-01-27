@@ -296,8 +296,8 @@ class SSHCmdProcess(CmdProcess):
             if line.startswith('filename:'):
                 file_name = str(line)
                 file_name = file_name[file_name.find(":") + 1:len(file_name)]
-
-                return file_name.lstrip()
+                
+                return file_name.lstrip().rstrip()
     
         return ""
     
