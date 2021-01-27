@@ -100,17 +100,20 @@ class DriverChecks:
 
     def AnalysisOS(self, query='all'):
         driver_list = self.cmdProcess.get_os_drivers()
+
         driver_running_list = self.cmdProcess.get_running_drivers()
+
+        # Only for save debuging time, so we only check the top 10 drivers and top 5 running drivers
+        # driver_list = driver_list[0:10]
+        # driver_running_list = driver_running_list[0:5]
+
         driver_running_file_list = []
         for driver in driver_running_list:
-            driver_running_file_list.append(self.cmdProcess.get_running_driver_path(driver))
+            driver_path = self.cmdProcess.get_running_driver_path(driver)
+            driver_running_file_list.append(driver_path)
 
         for driver in driver_list:
-            running = driver in driver_running_file_list
-            if running is True:
-                running = "True"
-            else:
-                running = "False"
+            running = str(driver in driver_running_file_list)
         
             rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
 
