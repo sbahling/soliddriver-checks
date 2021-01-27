@@ -125,7 +125,7 @@ class LocalCmdProcess(CmdProcess):
         command = shlex.split(command)
         rpm_info = subprocess.Popen(command, stdout=subprocess.PIPE)
         info, errs = rpm_info.communicate()
-    
+
         return self.format_rpm_name(info)
 
     def check_support_flag(self, driver: str) -> str:
@@ -296,7 +296,7 @@ class SSHCmdProcess(CmdProcess):
             if line.startswith('filename:'):
                 file_name = str(line)
                 file_name = file_name[file_name.find(":") + 1:len(file_name)]
-                
+
                 return file_name.lstrip().rstrip()
     
         return ""

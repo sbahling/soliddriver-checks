@@ -1,6 +1,5 @@
 import parameters
 from utils import input_data
-from utils import analysis
 from utils import export
 from utils import remote_check
 from utils import checks
@@ -40,7 +39,9 @@ if __name__ == "__main__":
             result['Solid Driver Checks'] = check_result
             export.os_export_to_excel(result, args.file)
     elif args.driver != None:
-        driver_support_flag, running, found, rpm_info = analysis.analysis_driver(args.driver)
+        driverCheck = checks.DriverChecks()
+        driver_support_flag, running, rpm_info = driverCheck.Analysis(args.driver)
+        export.print_driver(args.driver, driver_support_flag, running, rpm_info)
     elif args.remote != None:
         servers = remote_check.get_remote_server_config(args.remote)
         check_result = remote_check.check_remote_servers(servers)
