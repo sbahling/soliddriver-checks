@@ -154,7 +154,7 @@ class DriverChecks:
             drivers_running_files.append(self.cmdProcess.get_running_driver_path(driver))
     
         driver_support_flag = self.cmdProcess.check_support_flag(path)
-        running = driver in drivers_running_files
-        rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
+        running = path in drivers_running_files
+        rpm_info = self.cmdProcess.get_rpm_from_driver(path)
 
         return driver_support_flag, running, rpm_info

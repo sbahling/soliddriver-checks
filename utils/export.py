@@ -1,5 +1,6 @@
 from rich.console import Console
 from rich.table import Column, Table
+from pathlib import Path
 import pandas as pd
 import os
 from dominate import document
@@ -241,3 +242,27 @@ def remote_export_to_pdf(driver_collections, file):
 def remote_export_to_excel(driver_collections, file):
     for server in driver_collections:
         os_export_to_excel(driver_collections[server], file, server)
+
+def print_rpm():
+    pass
+
+def print_driver(path, driver_support_flag, running, rpm_info):
+    console = Console()
+    console.print("Name: " + Path(path).name, style="bold green")
+    style = "bold green"
+    if running is False:
+        style = "bold grey85"
+    console.print("Running: ", running, style=style)
+    if driver_support_flag == "yes":
+        console.print("Support Status: Driver is supported by SUSE", style="bold green")
+    elif driver_support_flag == "external":
+        console.print("Support Status: Driver is supported by both SUSE and vendor", style="bold blue")
+    elif driver_support_flag == "N/A":
+        console.print("Support Status: Driver don't have support flag!", style="bold red")
+    else:
+        console.print("Support Status: Unknow, driver support flag is ", driver_support_flag, style="bold red")
+    style="bold green"
+    if 'is not owned by any package' in rpm_info:
+        console.print(rpm_info, style="bold red")
+    else:
+        console.print("Driver is in rpm: " + rpm_info, style="bold green")
