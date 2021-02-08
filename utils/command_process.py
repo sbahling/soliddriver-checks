@@ -8,31 +8,31 @@ import paramiko
 
 
 def get_cmd_os_drivers():
-    return 'find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$"'
+    return r'find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$"'
 
 
 def get_cmd_running_drivers():
-    return 'cat /proc/modules | awk \'{print $1}\''
+    return r'cat /proc/modules | awk \'{print $1}\''
 
 
 def get_cmd_running_driver_path(driver):
-    return '/usr/sbin/modinfo %s' % driver
+    return r'/usr/sbin/modinfo %s' % driver
 
 
 def get_cmd_rpm_from_driver(driver):
-    return 'rpm -qf %s' % driver
+    return r'rpm -qf %s' % driver
 
 
 def get_cmd_modinfo_cmd(driver):
-    return '/usr/sbin/modinfo %s' % driver
+    return r'/usr/sbin/modinfo %s' % driver
 
 
 def get_cmd_rpm_info(rpm):
-    return 'rpm -qpi --nosignature %s' % rpm
+    return r'rpm -qpi --nosignature %s' % rpm
 
 
 def get_cmd_unpack_rpm(rpm):
-    return 'rpm2cpio %s | cpio -idmv' % rpm
+    return r'rpm2cpio %s | cpio -idmv' % rpm
 
 
 class CmdProcess:
