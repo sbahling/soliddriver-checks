@@ -1,12 +1,11 @@
 from rich.console import Console
-from rich.table import Column, Table
+from rich.table import Table
 from pathlib import Path
 import pandas as pd
 import os
-from dominate import document
 from dominate.tags import body, div, html, h1
 from dominate.util import raw
-from openpyxl.styles import Color, PatternFill, Font, Border
+from openpyxl.styles import PatternFill, Font
 from openpyxl.styles.differential import DifferentialStyle
 from openpyxl import load_workbook
 from openpyxl.formatting.rule import Rule

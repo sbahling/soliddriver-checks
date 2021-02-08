@@ -1,5 +1,4 @@
 import json
-import paramiko
 from utils import checks
 
 
