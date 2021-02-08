@@ -211,7 +211,7 @@ class LocalCmdProcess(CmdProcess):
         for line in modeinfo:
             if line.startswith(b'filename:'):
                 file_name = str(line)
-                file_name = file_name[file_name.find(':') + 1:len(file_name)-3]
+                file_name = file_name[file_name.find(':') + 1:len(file_name) - 3]
 
                 return file_name.lstrip()
 
@@ -250,7 +250,10 @@ class SSHCmdProcess(CmdProcess):
     def connect(self):
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.ssh.connect(hostname=self.ip, username=self.user, password=self.password, port=self.ssh_port)
+        self.ssh.connect(hostname=self.ip,
+                         username=self.user,
+                         password=self.password,
+                         port=self.ssh_port)
 
     def get_os_drivers(self) -> []:
         """Get all drivers under /lib/modules/"""
