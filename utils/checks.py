@@ -2,6 +2,7 @@ from utils import command_process
 import pandas as pd
 from pathlib import Path
 
+
 class RPMChecks:
     def __init__(self):
         self.cmdProcess = command_process.LocalCmdProcess()
@@ -19,24 +20,24 @@ class RPMChecks:
         return df
 
     def AnalysisDir(self, path, query='all'):
-        driver_df = pd.DataFrame({"Name":[],
-                            "Vendor":[],
-                            "Signature":[],
-                            "Distribution":[],
-                            "Driver Support Status":[]})
-        
+        driver_df = pd.DataFrame({'Name': [],
+                                  'Vendor': [],
+                                  'Signature': [],
+                                  'Distribution': [],
+                                  'Driver Support Status': []})
+
         rpm_files = self.cmdProcess.get_rpms_from_dir(path=path)
 
         for rpm in rpm_files:
             name, signature, distribution, vendor, driver_support_flags = self.analysisRPM(rpm)
             dsf = self.driver_support_flags_to_string(driver_support_flags)
-            new_row = {'Name':name, 
-                    'Vendor':vendor,
-                    'Signature':signature,
-                    'Distribution':distribution,
-                    'Driver Support Status':dsf}
+            new_row = {'Name': name,
+                       'Vendor': vendor,
+                       'Signature': signature,
+                       'Distribution': distribution,
+                       'Driver Support Status': dsf}
             driver_df = driver_df.append(new_row, ignore_index=True)
-    
+
         if query == 'all':
             return driver_df
         elif query == 'suse':
@@ -45,7 +46,7 @@ class RPMChecks:
             return self.get_vendor_support_rpms(driver_df)
         elif query == 'unknow':
             return self.get_unknow_rpms(driver_df)
-        
+
         return driver_df
 
     def analysisRPM(self, rpm_file):
@@ -61,41 +62,43 @@ class RPMChecks:
             return driver_support_status
 
         for support_type, drivers in driver_support_flags.items():
-            if support_type == "external" and len(drivers) > 0:
-                driver_support_status = driver_support_status + "Supported by both SUSE and the vendor:\n"
-            elif support_type == "yes" and len(drivers) > 0:
-                driver_support_status = driver_support_status + "Supported by SUSE:\n"
-            elif support_type == "N/A" and len(drivers) > 0:
-                driver_support_status = driver_support_status + "Not supported by SUSE:\n"
+            if support_type == 'external' and len(drivers) > 0:
+                driver_support_status = driver_support_status + 'Supported by both SUSE and the vendor:\n'
+            elif support_type == 'yes' and len(drivers) > 0:
+                driver_support_status = driver_support_status + 'Supported by SUSE:\n'
+            elif support_type == 'N/A' and len(drivers) > 0:
+                driver_support_status = driver_support_status + 'Not supported by SUSE:\n'
             for driver in drivers:
-                driver_support_status = driver_support_status + "\t" + driver +  "\n"
-    
+                driver_support_status = driver_support_status + '\t' + driver + '\n'
+
         return driver_support_status
 
+
 class DriverChecks:
-    def __init__(self, ip='127.0.0.1', user='', password='', ssh_port=22):
+    def __init__(self, logger, ip='127.0.0.1', user='', password='', ssh_port=22):
+        self.logger = logger
         if ip == '127.0.0.1':
             self.cmdProcess = command_process.LocalCmdProcess()
         else:
             self.cmdProcess = command_process.SSHCmdProcess(ip, user, password, ssh_port)
             self.cmdProcess.connect()
-        
-        self.driver_df = pd.DataFrame({"Name":[],
-                                 "Path":[],
-                                 "Support Flag":[],
-                                 "Running":[],
-                                 "RPM Information":[]})
+
+        self.driver_df = pd.DataFrame({'Name': [],
+                                       'Path': [],
+                                       'Support Flag': [],
+                                       'Running': [],
+                                       'RPM Information': []})
 
     def get_suse_support_drivers(self):
-        rslt_df = self.driver_df.loc[self.driver_df['Support Flag']] is "yes" 
+        rslt_df = self.driver_df.loc[self.driver_df['Support Flag']] == 'yes'
         return rslt_df
 
     def get_vendor_support_drivers(self):
-        rslt_df = self.driver_df.loc[self.driver_df['Support Flag']] is "external" 
+        rslt_df = self.driver_df.loc[self.driver_df['Support Flag']] == 'external'
         return rslt_df
 
     def get_unknow_drivers(self):
-        rslt_df = self.driver_df.loc[self.driver_df['Support Flag']] is "N/A" 
+        rslt_df = self.driver_df.loc[self.driver_df['Support Flag']] == 'N/A'
         return rslt_df
 
     def AnalysisOS(self, query='all'):
@@ -114,26 +117,26 @@ class DriverChecks:
 
         for driver in driver_list:
             running = str(driver in driver_running_file_list)
-        
+
             rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
 
-            new_row = {'Name':Path(driver).name, 
-                   'Path':driver,
-                   'Support Flag': self.cmdProcess.check_support_flag(driver),
-                   'Running': running,
-                   'RPM Information': rpm_info}
+            new_row = {'Name': Path(driver).name,
+                       'Path': driver,
+                       'Support Flag': self.cmdProcess.check_support_flag(driver),
+                       'Running': running,
+                       'RPM Information': rpm_info}
             self.driver_df = self.driver_df.append(new_row, ignore_index=True)
-    
+
         for driver in driver_running_file_list:
             if driver.startswith('/lib/modules') is False:
                 driver_support_flag = self.cmdProcess.check_support_flag(driver)
                 running = True
                 rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
-                new_row = {'Name':Path(driver).name, 
-                   'Path':driver,
-                   'Support Flag': driver_support_flag,
-                   'Running': running,
-                   'RPM Information': rpm_info}
+                new_row = {'Name': Path(driver).name,
+                           'Path': driver,
+                           'Support Flag': driver_support_flag,
+                           'Running': running,
+                           'RPM Information': rpm_info}
                 self.driver_df = self.driver_df.append(new_row, ignore_index=True)
 
         if query == 'all':
@@ -152,7 +155,7 @@ class DriverChecks:
         drivers_running_files = []
         for driver in drivers_running:
             drivers_running_files.append(self.cmdProcess.get_running_driver_path(driver))
-    
+
         driver_support_flag = self.cmdProcess.check_support_flag(path)
         running = path in drivers_running_files
         rpm_info = self.cmdProcess.get_rpm_from_driver(path)
