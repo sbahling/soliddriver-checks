@@ -14,7 +14,7 @@ def parameter_parse():
     command_group.add_argument('-e', '--remote', dest="remote", help="check remote servers")
 
     parser.add_argument('-f', '--file', dest='file', help="output file name")
-    parser.add_argument('-o', '--output', dest="output", choices=['html', 'pdf', 'excel', 'terminal'], default='terminal', help="output to a file")
+    parser.add_argument('-o', '--output', dest="output", choices=['html', 'excel', 'terminal', 'all'], default='terminal', help="output to a file")
     parser.add_argument('-q', '--query', dest="query", choices=['suse', 'vendor', 'unknow', 'all'], default='all', help='only show suse build, vendor build, unknow or all of them')
 
     args = parser.parse_args()

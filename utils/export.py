@@ -70,9 +70,6 @@ def rpms_export_to_html(df, file):
     with open(file, 'w') as f:
         f.write(s.render())
 
-def rpms_export_to_pdf(df, file):
-    df.to_pdf(file, index=False)
-
 def rpms_export_to_excel(df, file):
     writer = pd.ExcelWriter(file, engine='xlsxwriter')
     df.to_excel(writer, index=False, sheet_name='Solid Driver Checks')
@@ -178,9 +175,6 @@ def os_export_to_html(df_collection, file):
     with open(file, 'w') as f:
         f.write(context.render())
 
-def os_export_to_pdf(df, file):
-    df.to_pdf(file, index=False)
-
 def os_export_to_excel(df, file, sheet='Solid Driver Checks'):
     writer = pd.ExcelWriter(file, engine='openpyxl')
     if os.path.exists(file):
@@ -235,9 +229,6 @@ def remote_export_to_terminal(driver_collections):
 
 def remote_export_to_html(driver_collections, file):
     os_export_to_html(driver_collections, file)
-
-def remote_export_to_pdf(driver_collections, file):
-    pass
 
 def remote_export_to_excel(driver_collections, file):
     for server in driver_collections:

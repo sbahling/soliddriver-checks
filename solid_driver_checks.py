@@ -4,6 +4,7 @@ from utils import export
 from utils import remote_check
 from utils import checks
 import os
+import logging
 
 if __name__ == "__main__":
     args = parameters.parameter_parse()
@@ -16,10 +17,10 @@ if __name__ == "__main__":
             export.rpms_export_to_terminal(check_result)
         elif args.output == 'html':
             export.rpms_export_to_html(check_result, args.file)
-        elif args.output == 'pdf':
-            export.rpms_export_to_pdf(check_result, args.file)
         elif args.output == 'excel':
             export.rpms_export_to_excel(check_result, args.file)
+        elif args.output == 'all':
+            pass
     elif args.rpm != None:
         rpmCheck = checks.RPMChecks()
         check_result = rpmCheck.analysisRPM(args.rpm)
@@ -32,8 +33,6 @@ if __name__ == "__main__":
             export.os_export_to_terminal(check_result)
         elif args.output == 'html':
             export.os_export_to_html(check_result, args.file)
-        elif args.output == 'pdf':
-            export.os_export_to_pdf(check_result, args.file)
         elif args.output == 'excel':
             result = dict()
             result['Solid Driver Checks'] = check_result
@@ -50,8 +49,6 @@ if __name__ == "__main__":
             export.remote_export_to_terminal(check_result)
         elif args.output == 'html':
             export.remote_export_to_html(check_result, args.file)
-        elif args.output == 'pdf':
-            export.remote_export_to_pdf(check_result, args.file)
         elif args.output == 'excel':
             if os.path.exists(args.file):
                 os.remove(args.file)

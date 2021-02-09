@@ -73,7 +73,8 @@ class RPMChecks:
         return driver_support_status
 
 class DriverChecks:
-    def __init__(self, ip='127.0.0.1', user='', password='', ssh_port=22):
+    def __init__(self, logger, ip='127.0.0.1', user='', password='', ssh_port=22):
+        self.logger = logger
         if ip == '127.0.0.1':
             self.cmdProcess = command_process.LocalCmdProcess()
         else:
