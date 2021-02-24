@@ -4,8 +4,9 @@ from pathlib import Path
 
 
 class RPMChecks:
-    def __init__(self):
+    def __init__(self, logger):
         self.cmdProcess = command_process.LocalCmdProcess()
+        self.logger = logger
 
     def get_suse_support_rpms(self, rpms):
         df = rpms[rpms['Driver Support Status'].str.contains('Supported by SUSE')]
@@ -28,7 +29,9 @@ class RPMChecks:
 
         rpm_files = self.cmdProcess.get_rpms_from_dir(path=path)
 
+        self.logger.info("Found RPMs total: %d", len(rpm_files))
         for rpm in rpm_files:
+            self.logger.info("Start to analysis RPM: %s", rpm)
             name, signature, distribution, vendor, driver_support_flags = self.analysisRPM(rpm)
             dsf = self.driver_support_flags_to_string(driver_support_flags)
             new_row = {'Name': name,
@@ -37,6 +40,7 @@ class RPMChecks:
                        'Distribution': distribution,
                        'Driver Support Status': dsf}
             driver_df = driver_df.append(new_row, ignore_index=True)
+        self.logger.info("Analysis is completed!")
 
         if query == 'all':
             return driver_df
@@ -106,6 +110,7 @@ class DriverChecks:
 
         driver_running_list = self.cmdProcess.get_running_drivers()
 
+        self.logger.info("Found total drivers on the local system total: %d", len(driver_list))
         # Only for save debuging time, so we only check the top 10 drivers and top 5 running drivers
         # driver_list = driver_list[0:10]
         # driver_running_list = driver_running_list[0:5]
@@ -116,6 +121,7 @@ class DriverChecks:
             driver_running_file_list.append(driver_path)
 
         for driver in driver_list:
+            self.logger.info("Start to analysis driver: %s", driver)
             running = str(driver in driver_running_file_list)
 
             rpm_info = self.cmdProcess.get_rpm_from_driver(driver)
@@ -128,6 +134,7 @@ class DriverChecks:
             self.driver_df = self.driver_df.append(new_row, ignore_index=True)
 
         for driver in driver_running_file_list:
+            self.logger.info("Start to analysis driver: %s", driver)
             if driver.startswith('/lib/modules') is False:
                 driver_support_flag = self.cmdProcess.check_support_flag(driver)
                 running = True
@@ -138,6 +145,7 @@ class DriverChecks:
                            'Running': running,
                            'RPM Information': rpm_info}
                 self.driver_df = self.driver_df.append(new_row, ignore_index=True)
+        self.logger.info("Analysis is completed!")
 
         if query == 'all':
             return self.driver_df
