@@ -1,0 +1,46 @@
+{
+    "table": {
+        "border": "2px solid green",
+        "th": {
+            "font-size": "12pt",
+            "font-family":"arial",
+            "background-color":"green"
+        },
+        "td": {
+            "font-size": "10pt",
+            "font-family":"arial"
+        }
+    },
+    "highlight":{
+        "support-flag": {
+            "N/A": {
+                "font-color": "9C0006",
+                "background-color": "FFC7CE"
+            },
+            "external": {
+                "font-color": "000000FF",
+                "background-color": "0099CCFF"
+            },
+            "yes":{
+                "font-color": "00008000",
+                "background-color": "0099CC00"
+            }
+        },
+        "running":{
+            "true":{
+                "font-color": "00008000",
+                "background-color": "0099CC00"
+            },
+            "false":{
+                "font-color": "00808080",
+                "background-color": "00C0C0C0"
+            }
+        },
+        "rpm-info":{
+            "no-rpm": {
+                "font-color": "9C0006",
+                "background-color": "FFC7CE"
+            }
+        }
+    }
+}

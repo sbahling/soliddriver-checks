@@ -1,6 +1,18 @@
 import argparse
 import os
 
+def output_check(args, parser):
+    if args.output != 'terminal':
+            if args.output == 'all':
+                if args.outputdir is None:
+                    print('Please give a directory to store the files.')
+                    parser.print_help()
+                    exit(0)
+            else:
+                if args.file is None:
+                    print('Please give a file name.')
+                    parser.print_help()
+                    exit(0)
 
 def parameter_parse():
     description = 'Check RPM(s)/driver(s) support status.'
@@ -13,8 +25,9 @@ def parameter_parse():
     command_group.add_argument('-s', '--system', action='store_true', help='check drivers running in the system')
     command_group.add_argument('-e', '--remote', dest='remote', help='check remote servers')
 
-    parser.add_argument('-f', '--file', dest='file', help="output file name")
-    parser.add_argument('-o', '--output', dest="output", choices=['html', 'excel', 'terminal', 'all'], default='terminal', help="output to a file")
+    parser.add_argument('-of', '--file', dest='file', help="output file name")
+    parser.add_argument('-od', '--outputdir', dest='outputdir', help="output directory")
+    parser.add_argument('-o', '--output', dest="output", choices=['html', 'excel', 'terminal', 'pdf', 'all'], default='terminal', help="output to a file")
     parser.add_argument('-q', '--query', dest="query", choices=['suse', 'vendor', 'unknow', 'all'], default='all', help='only show suse build, vendor build, unknow or all of them')
 
     args = parser.parse_args()
@@ -23,10 +36,7 @@ def parameter_parse():
             print('Directory "(%s)" not found.' % (args.dir))
             exit(0)
 
-        if args.output != 'terminal' and args.file is None:
-            print('Please give a file name.')
-            parser.print_help()
-            exit(0)
+        output_check(args, parser)
 
         return args
     elif args.rpm is not None:
@@ -42,17 +52,11 @@ def parameter_parse():
 
         return args
     elif args.system:
-        if args.output != 'terminal' and args.file is None:
-            print('Please give a file name.')
-            parser.print_help()
-            exit(0)
+        output_check(args, parser)
 
         return args
     elif args.remote is not None:
-        if args.output != 'terminal' and args.file is None:
-            print('Please give a file name.')
-            parser.print_help()
-            exit(0)
+        output_check(args, parser)
 
         return args
     else:
