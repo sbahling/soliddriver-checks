@@ -1,6 +1,7 @@
 import argparse
 import os
 
+
 def output_check(args, parser):
     if args.output != 'terminal':
             if args.output == 'all':
@@ -13,6 +14,7 @@ def output_check(args, parser):
                     print('Please give a file name.')
                     parser.print_help()
                     exit(0)
+
 
 def parameter_parse():
     description = 'Check RPM(s)/driver(s) support status.'
