@@ -262,8 +262,8 @@ def os_export_to_excel(df, file, sheet='Solid Driver Checks'):
 
     records = str(len(df.index) + 1)
     support_flag_area = 'C2:C' + records
-    running_area = 'D2:D' + records
-    rpm_info_area = 'E2:E' + records
+    running_area = 'E2:DE' + records
+    rpm_info_area = 'F2:F' + records
 
     support_flag_format = load_support_flag_format()
     na_text = Font(color=support_flag_format['N/A']['font-color'])

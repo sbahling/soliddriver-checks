@@ -1,45 +1,52 @@
 {
+    "body":{
+        "font-family": "sans-serif"
+    },
     "table": {
         "border": "2px solid green",
+        "background-color": "EFEFEF",
         "th": {
+            "border": "1px solid green",
             "font-size": "12pt",
-            "font-family":"arial",
-            "background-color":"green"
+            "font-family":"sans-serif",
+            "background-color":"90EBCD"
         },
         "td": {
+            "border": "1px solid green",
             "font-size": "10pt",
-            "font-family":"arial"
+            "font-family":"sans-serif",
+            "background-color":"C0C0C0"
         }
     },
     "highlight":{
         "support-flag": {
-            "N/A": {
-                "font-color": "9C0006",
-                "background-color": "FFC7CE"
+            "Missing": {
+                "font-color": "000000",
+                "background-color": "FE7C3F"
             },
             "external": {
-                "font-color": "000000FF",
-                "background-color": "0099CCFF"
+                "font-color": "000000",
+                "background-color": "2453FF"
             },
             "yes":{
-                "font-color": "00008000",
-                "background-color": "0099CC00"
+                "font-color": "FFFFFF",
+                "background-color": "90EBCD"
             }
         },
         "running":{
             "true":{
-                "font-color": "00008000",
-                "background-color": "0099CC00"
+                "font-color": "FFFFFF",
+                "background-color": "90EBCD"
             },
             "false":{
-                "font-color": "00808080",
-                "background-color": "00C0C0C0"
+                "font-color": "FFFFFF",
+                "background-color": "C0C0C0"
             }
         },
         "rpm-info":{
             "no-rpm": {
-                "font-color": "9C0006",
-                "background-color": "FFC7CE"
+                "font-color": "000000",
+                "background-color": "FE7C3F"
             }
         }
     }
