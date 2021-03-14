@@ -23,7 +23,6 @@ def parameter_parse():
     command_group = parser.add_mutually_exclusive_group()
     command_group.add_argument('-d', '--dir', dest='dir', help='RPM(s) in this dirctory')
     command_group.add_argument('-r', '--rpm', dest='rpm', help='RPM file')
-    command_group.add_argument('-i', '--driver', dest='driver', help='driver file')
     command_group.add_argument('-s', '--system', action='store_true', help='check drivers running in the system')
     command_group.add_argument('-e', '--remote', dest='remote', help='check remote servers')
 
