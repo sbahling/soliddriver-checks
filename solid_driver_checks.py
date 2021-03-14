@@ -5,6 +5,9 @@ from utils import data_reader
 import os
 import logging
 from rich.logging import RichHandler
+from rich.live import Live
+from utils import terminal_visualizer
+from rich.progress import Progress
 
 if __name__ == "__main__":
     args = parameters.parameter_parse()
@@ -13,17 +16,15 @@ if __name__ == "__main__":
     logging.basicConfig(format=FORMAT, handlers=[RichHandler()])
     logger = logging.getLogger('rich')
     logger.setLevel(logging.INFO)
-    logger.info("Hello")
 
     if args.dir is not None:
         rpmCheck = data_reader.RPMReader(logger)
-        check_result = rpmCheck.GetRPMsInfo(path=args.dir, query=args.query)
-
+        to_terminal = terminal_visualizer.RPMTerminal()
+        with Live(to_terminal.get_table()):
+            check_result = rpmCheck.GetRPMsInfo(path=args.dir, row_handlers=[to_terminal.AddRow], query=args.query)
         save_to_file = data_exporter.RPMsExporter(logger)
 
-        if args.output == 'terminal':
-            save_to_file.to_terminal(check_result)
-        elif args.output == 'html':
+        if args.output == 'html':
             save_to_file.to_html(check_result, args.file)
         elif args.output == 'excel':
             save_to_file.to_excel(check_result, args.file)
@@ -36,21 +37,20 @@ if __name__ == "__main__":
         check_result = rpmCheck.GetRPMInfo(args.rpm)
         print(check_result)
     elif args.system:
-        driverCheck = data_reader.DriverReader(logger)
-        check_result = driverCheck.get_local_drivers(args.query)
-
-        if args.output == 'terminal':
-            export.os_export_to_terminal(check_result)
-        elif args.output == 'html':
-            export.os_export_to_html(check_result, args.file)
+        with Progress() as progress:
+            driverCheck = data_reader.DriverReader(logger, progress)
+            check_result = driverCheck.get_local_drivers(args.query)
+        save_to_file = data_exporter(logger)
+        if args.output == 'html':
+            save_to_file.to_html(check_result, args.file)
         elif args.output == 'excel':
             result = dict()
             result['Solid Driver Checks'] = check_result
-            export.os_export_to_excel(result, args.file)
+            save_to_file.to_excel(result, args.file)
         elif args.output == 'pdf':
-            export.os_export_to_pdf(check_result, args.file)
+            save_to_file.to_pdf(check_result, args.file)
         elif args.output == 'all':
-            export.os_export_to_all(check_result, args.outputdir)
+            save_to_file.to_all(check_result, args.outputdir)
     elif args.remote is not None:
         servers = remote_check.get_remote_server_config(args.remote)
         check_result = remote_check.check_remote_servers(logger, servers)
@@ -63,7 +63,7 @@ if __name__ == "__main__":
                 os.remove(args.file)
             save_to_file.to_excel(check_result, args.file)
         elif args.output == 'pdf':
-            save_to_file.to_pdf(check_result, file)
+            save_to_file.to_pdf(check_result, args.file)
         elif args.output == 'all':
             save_to_file.to_all(check_result, args.outputdir)
 

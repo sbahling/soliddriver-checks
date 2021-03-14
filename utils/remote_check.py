@@ -1,6 +1,8 @@
 import json
-from utils import checks
-
+from utils import data_reader
+from utils import terminal_visualizer
+from rich.progress import Progress
+from paramiko.ssh_exception import NoValidConnectionsError
 
 def get_remote_server_config(file):
     with open(file) as jf:
@@ -16,17 +18,14 @@ def check_remote_servers(logger, servers):
 
         logger.info("Start to analysis server: %s", server['ip'])
         try:
-            driverCheck = checks.DriverChecks(logger = logger, 
-                                          ip=server['ip'],
-                                          user=server['user'],
-                                          password=server['password'],
-                                          ssh_port=server['ssh_port'])
-            drivers = driverCheck.AnalysisOS(query=server['query'])
-            check_result[server['ip']] = drivers
+            with Progress() as progress:
+                reader = data_reader.DriverReader(logger, progress)
+                drivers = reader.get_remote_drivers(ip=server['ip'], user=server['user'], password=server['password'], ssh_port=server['ssh_port'], query=server['query'])
+                check_result[server['ip']] = drivers
         except NoValidConnectionsError:
             logger.error("Can not connect to server: %s", server['ip'])
         finally:
-            logger.error("Analysis server failed: %s", server['ip'])
+            pass
 
     logger.info("Analysis is completed!")
 

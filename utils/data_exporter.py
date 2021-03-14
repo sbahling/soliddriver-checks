@@ -61,40 +61,6 @@ class RPMsExporter:
     def __init__(self, logger, formatting_config_file='config/color.default.json'):
         self.logger = logger
         self.formatting = FormatConfig(formatting_config_file)
-        # self.console = Console()
-        self.table = Table(show_header=True, header_style='bold green', show_lines=True)
-        self.table.add_column('Name', width=32)
-        self.table.add_column('Path', width=64)
-        self.table.add_column('Vendor', width=12)
-        self.table.add_column('Signature', width=28)
-        self.table.add_column('Distribution', width=12)
-        self.table.add_column('Driver Flag: supported')
-
-    def to_terminal(self, rpm_table):
-        with Live(self.table):
-            for _, row in rpm_table.iterrows():
-                name = row['Name']
-                path = row['Path']
-                vendor = row['Vendor']
-                signature = row['Signature']
-                distribution = row['Distribution']
-                driver_supported = row['Driver Flag: supported']
-
-                ds_formatting = ''
-                for driver in driver_supported.split('\n'):
-                    values = driver.split(': ')
-
-                    if len(values) < 2:
-                        ds_formatting += '[red]' + driver + '[/red]' + '\n'
-                    elif values[1] == 'yes':
-                        ds_formatting += '[green]' + driver + '[/green]' + '\n'
-                    elif values[1] == 'external':
-                        ds_formatting += '[blue]' + driver + '[/blue]' + '\n'
-                    elif values[1] == 'no' or values[1] == 'Missing':
-                        ds_formatting += '[red]' + driver + '[/red]' + '\n'
-
-                self.table.add_row(name, path, vendor, signature, distribution, ds_formatting)
-
 
     def supported_formatting(self, value):
         formatting = self.formatting.load_support_flag_format()
@@ -279,7 +245,14 @@ class DriversExporter:
             workbook = load_workbook(filename=file)
             worksheet = workbook[server]
 
-            records = str(len(driver_tables[server].index) + 1)
+            records = len(driver_tables[server].index)
+
+            if records < 1:
+                workbook.save(file)
+                continue
+            
+            records = str(len(driver_tables[server].index))
+
             support_flag_area = 'C2:C' + records
             running_area = 'E2:E' + records
             rpm_info_area = 'F2:F' + records
