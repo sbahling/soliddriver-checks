@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "solid_driver_checks"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Hui-Zhi Zhao <hui.zhi.zhao@suse.com>"]
-description = "Check RPM(s) and Drivers(s) information"
-license = "GPL 2.0"
+description = "Check RPM(s) and Drivers information"
+license = "GPL-2.0"
 packages = [
     {include = 'solid-driver-checks'}, 
     {include = 'tests'},
@@ -11,7 +11,7 @@ packages = [
 classifiers=[
     "Development Status :: 1 - Alpha",
     "Topic :: Utilities",
-    "License :: OSI Approved :: GPL 2.0 License",
+    "License :: OSI Approved :: GPL-2.0 License",
 ]
 
 [tool.poetry.dependencies]

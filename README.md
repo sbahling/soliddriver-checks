@@ -1,6 +1,6 @@
 # solid-driver-checks
 
-A tool for RPM(s) and installed/running drivers checking, with this tool, users can have an overview of their RPM(s) and drivers status:
+A tool for ```RPM(s)``` and ```installed/running drivers``` checking, with this tool, users can have an overview of their RPM(s) and drivers status:
 
  - RPM(s): checks ```vendor```, ```signature```, ```distribution``` and ```supported``` flag for drivers.
 
