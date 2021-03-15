@@ -46,12 +46,6 @@ def parameter_parse():
             exit(0)
 
         return args
-    elif args.driver is not None:
-        if os.path.isfile(args.driver) is False:
-            print('Driver "(%s)" not found.' % (args.driver))
-            exit(0)
-
-        return args
     elif args.system:
         output_check(args, parser)
 
