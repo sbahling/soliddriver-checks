@@ -9,8 +9,6 @@ optional arguments: <br />
  - -h, --help            show this help message and exit<br />
  - -d DIR, --dir DIR     RPM(s) in this dirctory<br />
  - -r RPM, --rpm RPM     RPM file<br />
- - -i DRIVER, --driver DRIVER<br />
-                        driver file<br />
  - -s, --system          check drivers running in the system<br />
  - -e REMOTE, --remote config file check remote servers<br />
  - -f FILE, --file FILE  output file name<br />
@@ -23,6 +21,5 @@ optional arguments: <br />
 # Examples:
 
  - Check local RPMs.
- - Check local driver.
  - Check all drivers on the system.
  - Check remote drivers.

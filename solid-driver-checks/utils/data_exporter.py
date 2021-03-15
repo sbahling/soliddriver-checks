@@ -1,7 +1,5 @@
-from rich.console import Console
 from rich.table import Table
 from rich.live import Live
-from pathlib import Path
 import pdfkit
 import pandas as pd
 import os
@@ -182,18 +180,18 @@ class DriversExporter:
     def supported_html_format_handler(self, value):
         value = value.lstrip().rstrip()
         supported = self.formatting.load_support_flag_format()
-        if value is 'yes':
+        if value == 'yes':
             return  'background-color:%s' % supported['yes']['background-color']
-        elif value is 'external':
+        elif value == 'external':
             return 'background-color:%s' % supported['external']['background-color']
-        elif value is 'Missing' or value is 'no':
+        elif value == 'Missing' or value is 'no':
             return 'background-color:%s' % supported['Missing']['background-color']
 
         return ''
 
     def running_html_format_handler(self, value):
         running_format = self.formatting.load_running_format()
-        if value is 'True':
+        if value == 'True':
             return 'background-color:%s' % running_format['true']['background-color']
 
         return 'background-color:%s' % running_format['false']['background-color']
