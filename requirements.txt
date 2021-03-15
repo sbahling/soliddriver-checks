@@ -1,0 +1,6 @@
+rich==9.12.4
+pdfkit==0.6.1
+pandas==1.0.5
+dominate==2.6.0
+openpyxl==3.0.5
+paramiko==2.7.2

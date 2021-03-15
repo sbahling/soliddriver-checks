@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "solid_driver_checks"
+version = "0.0.1"
+authors = ["Hui-Zhi Zhao <hui.zhi.zhao@suse.com>"]
+description = "Check RPM(s) and Drivers(s) information"
+license = "GPL 2.0"
+packages = [
+    {include = 'solid-driver-checks'}, 
+    {include = 'tests'},
+]
+classifiers=[
+    "Development Status :: 1 - Alpha",
+    "Topic :: Utilities",
+    "License :: OSI Approved :: GPL 2.0 License",
+]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/suse/solid-driver-checks/issues"
+"Repository" = "https://github.com/suse/solid-driver-checks"
+
+[build-system]
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
