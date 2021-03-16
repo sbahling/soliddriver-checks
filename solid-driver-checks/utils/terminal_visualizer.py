@@ -5,7 +5,8 @@ from rich.progress import Progress
 
 class RPMTerminal:
     def __init__(self):
-        self.table = Table(show_header=True, header_style='bold green', show_lines=True)
+        self.table = Table(show_header=True,
+                           header_style='bold green', show_lines=True)
         self.table.add_column('Name', width=32)
         self.table.add_column('Path', width=64)
         self.table.add_column('Vendor', width=12)
@@ -37,5 +38,5 @@ class RPMTerminal:
             elif values[1] == 'no' or values[1] == 'Missing':
                 ds_formatting += '[red]' + driver + '[/red]' + '\n'
 
-        self.table.add_row(name, path, vendor, signature, distribution, ds_formatting)
-
+        self.table.add_row(name, path, vendor,
+                           signature, distribution, ds_formatting)

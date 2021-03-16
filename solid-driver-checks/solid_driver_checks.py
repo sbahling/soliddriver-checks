@@ -21,7 +21,10 @@ if __name__ == "__main__":
         rpmCheck = data_reader.RPMReader(logger)
         to_terminal = terminal_visualizer.RPMTerminal()
         with Live(to_terminal.get_table()):
-            check_result = rpmCheck.GetRPMsInfo(path=args.dir, row_handlers=[to_terminal.AddRow], query=args.query)
+            check_result = rpmCheck.GetRPMsInfo(
+                path=args.dir,
+                row_handlers=[to_terminal.AddRow],
+                query=args.query)
         save_to_file = data_exporter.RPMsExporter(logger)
 
         if args.output == 'html':
