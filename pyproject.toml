@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "solid_driver_checks"
-version = "0.0.2"
+version = "v0.2-alpha"
 authors = ["Hui-Zhi Zhao <hui.zhi.zhao@suse.com>"]
 description = "Check RPM(s) and Drivers information"
 license = "GPL-2.0"
@@ -9,7 +9,7 @@ packages = [
     {include = 'tests'},
 ]
 classifiers=[
-    "Development Status :: 1 - Alpha",
+    "Development Status :: 2 - Alpha",
     "Topic :: Utilities",
     "License :: OSI Approved :: GPL-2.0 License",
 ]
