@@ -14,30 +14,30 @@ import time
 class FormatConfig:
     def __init__(self, config_file):
         with open(config_file) as jf:
-            self.formatting = json.load(jf)
+            self._formatting = json.load(jf)
 
     def load_body_format(self):
-        return self.formatting["body"]
+        return self._formatting["body"]
 
     def load_table_format(self):
-        return self.formatting["table"]
+        return self._formatting["table"]
 
     def load_rpm_info_format(self):
-        return self.formatting['highlight']['rpm-info']
+        return self._formatting['highlight']['rpm-info']
 
     def load_support_flag_format(self):
-        return self.formatting['highlight']['support-flag']
+        return self._formatting['highlight']['support-flag']
 
     def load_running_format(self):
-        return self.formatting['highlight']['running']
+        return self._formatting['highlight']['running']
 
 
 class HTMLTableFormatting:
     def __init__(self, formatting_config_file='config/color.default.json'):
-        self.formatting = FormatConfig(formatting_config_file)
+        self._formatting = FormatConfig(formatting_config_file)
 
     def get_style(self):
-        table_formatting = self.formatting.load_table_format()
+        table_formatting = self._formatting.load_table_format()
         styles = [
             dict(selector='table',
                  props=[('border', table_formatting['border'])]),
@@ -60,11 +60,11 @@ class HTMLTableFormatting:
 class RPMsExporter:
     def __init__(self, logger,
                  formatting_config_file='config/color.default.json'):
-        self.logger = logger
-        self.formatting = FormatConfig(formatting_config_file)
+        self._logger = logger
+        self._formatting = FormatConfig(formatting_config_file)
 
-    def supported_formatting(self, value):
-        formatting = self.formatting.load_support_flag_format()
+    def _supported_formatting(self, value):
+        formatting = self._formatting.load_support_flag_format()
         bgcolor_missing = formatting['Missing']['background-color']
         bgcolor_yes = formatting['yes']['background-color']
         bgcolor_external = formatting['external']['background-color']
@@ -83,7 +83,7 @@ class RPMsExporter:
 
         rpm_table['Driver Flag: supported'] = rpm_table['Driver Flag: supported'].str.replace('\n', '</br>')
 
-        s = rpm_table.style.applymap(self.supported_formatting,
+        s = rpm_table.style.applymap(self._supported_formatting,
                                      subset=pd.IndexSlice[:, ['Driver Flag: supported']],
                                      ).hide_index()
 
@@ -112,7 +112,7 @@ class RPMsExporter:
             workbook.save(file)
 
         area = 'F2:F' + str(records)
-        support_flag_format = self.formatting.load_support_flag_format()
+        support_flag_format = self._formatting.load_support_flag_format()
         na_text = Font(color=support_flag_format['Missing']['font-color'])
         na_fill = PatternFill(bgColor=support_flag_format['Missing']['background-color'])
         na = DifferentialStyle(font=na_text, fill=na_fill)
@@ -159,10 +159,10 @@ class RPMsExporter:
 class DriversExporter:
     def __init__(self, logger,
                  formatting_config_file='config/color.default.json'):
-        self.logger = logger
-        self.formatting = FormatConfig(formatting_config_file)
+        self._logger = logger
+        self._formatting = FormatConfig(formatting_config_file)
 
-    def supported_color(self, value):
+    def _supported_color(self, value):
         if value == 'yes':
             return '[green]' + value + '[/green]'
         elif value == 'external':
@@ -170,21 +170,21 @@ class DriversExporter:
         else:
             return '[red]' + value + '[/red]'
 
-    def running_color(self, value):
+    def _running_color(self, value):
         if value == 'True':
             return '[green]True[/green]'
         else:
             return '[gray]False[gray]'
 
-    def rpm_info_color(self, value):
+    def _rpm_info_color(self, value):
         if 'is not owned by any package' in value:
             return '[red]' + value + '[/red]'
         else:
             return value
 
-    def supported_html_format_handler(self, value):
+    def _supported_html_format_handler(self, value):
         value = value.lstrip().rstrip()
-        supported = self.formatting.load_support_flag_format()
+        supported = self._formatting.load_support_flag_format()
         bgcolor_yes = supported['yes']['background-color']
         bgcolor_external = supported['external']['background-color']
         bgcolor_missing = supported['Missing']['background-color']
@@ -197,8 +197,8 @@ class DriversExporter:
 
         return ''
 
-    def running_html_format_handler(self, value):
-        running_format = self.formatting.load_running_format()
+    def _running_html_format_handler(self, value):
+        running_format = self._formatting.load_running_format()
         bgcolor_true = running_format['true']['background-color']
         bgcolor_false = running_format['false']['background-color']
         if value == 'True':
@@ -206,8 +206,8 @@ class DriversExporter:
 
         return 'background-color:%s' % bgcolor_false
 
-    def rpm_info_html_format_handler(self, value):
-        rpm_format = self.formatting.load_rpm_info_format()
+    def _rpm_info_html_format_handler(self, value):
+        rpm_format = self._formatting.load_rpm_info_format()
         bgcolor_no_rpm = rpm_format['no-rpm']['background-color']
         if 'is not owned by any package' in value:
             return 'background-color:%s' % bgcolor_no_rpm
@@ -217,7 +217,7 @@ class DriversExporter:
     def to_html(self, driver_tables, file):
         html_table_formatter = HTMLTableFormatting()
         styles = html_table_formatter.get_style()
-        body_format = self.formatting.load_body_format()
+        body_format = self._formatting.load_body_format()
         context = html()
         with context:
             font_family = body_format["font-family"]
@@ -227,13 +227,13 @@ class DriversExporter:
                     h1('Solid Driver Checking Result: ' + key)
 
                     s = driver_tables[key].style.applymap(
-                                self.supported_html_format_handler,
+                                self._supported_html_format_handler,
                                 subset=pd.IndexSlice[:, ['Flag: supported']])
 
-                    s = s.applymap(self.running_html_format_handler,
+                    s = s.applymap(self._running_html_format_handler,
                                    subset=pd.IndexSlice[:, ['Running']])
 
-                    s = s.applymap(self.rpm_info_html_format_handler,
+                    s = s.applymap(self._rpm_info_html_format_handler,
                                    subset=pd.IndexSlice[:, ['RPM Information']]).hide_index()
                     s = s.set_table_styles(styles)
 
@@ -268,7 +268,7 @@ class DriversExporter:
             running_area = 'E2:E' + records
             rpm_info_area = 'F2:F' + records
 
-            support_flag_format = self.formatting.load_support_flag_format()
+            support_flag_format = self._formatting.load_support_flag_format()
             na_text = Font(color=support_flag_format['Missing']['font-color'])
             na_fill = PatternFill(bgColor=support_flag_format['Missing']['background-color'])
             na = DifferentialStyle(font=na_text, fill=na_fill)
@@ -278,14 +278,14 @@ class DriversExporter:
             external_text = Font(color=support_flag_format['external']['font-color'])
             external_fill = PatternFill(bgColor=support_flag_format['external']['background-color'])
             external = DifferentialStyle(font=external_text, fill=external_fill)
-            running_format = self.formatting.load_running_format()
+            running_format = self._formatting.load_running_format()
             false_text = Font(color=running_format['false']['font-color'])
             false_fill = PatternFill(bgColor=running_format['false']['background-color'])
             false_format = DifferentialStyle(font=false_text, fill=false_fill)
             true_text = Font(color=running_format['true']['font-color'])
             true_fill = PatternFill(bgColor=running_format['true']['background-color'])
             true_format = DifferentialStyle(font=true_text, fill=true_fill)
-            rpm_info_format = self.formatting.load_rpm_info_format()
+            rpm_info_format = self._formatting.load_rpm_info_format()
             no_rpm_text = Font(color=rpm_info_format['no-rpm']['font-color'])
             no_rpm_fill = PatternFill(bgColor=rpm_info_format['no-rpm']['background-color'])
             no_rpm = DifferentialStyle(font=no_rpm_text, fill=no_rpm_fill)
@@ -330,6 +330,8 @@ class DriversExporter:
     def to_all(self, driver_tables, directory):
         if not os.path.exists(directory):
             os.mkdir(directory)
+        else:
+            os.rmdir(directory)
 
         self.to_excel(driver_tables,
                       os.path.join(directory, 'check_result.xlsx'))

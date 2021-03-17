@@ -21,9 +21,9 @@ if __name__ == "__main__":
         rpmCheck = data_reader.RPMReader(logger)
         to_terminal = terminal_visualizer.RPMTerminal()
         with Live(to_terminal.get_table()):
-            check_result = rpmCheck.GetRPMsInfo(
+            check_result = rpmCheck.get_rpms_info(
                 path=args.dir,
-                row_handlers=[to_terminal.AddRow],
+                row_handlers=[to_terminal.add_row],
                 query=args.query)
         save_to_file = data_exporter.RPMsExporter(logger)
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
             save_to_file.to_all(check_result, args.outputdir)
     elif args.rpm is not None:
         rpmCheck = data_reader.RPMReader(logger)
-        check_result = rpmCheck.GetRPMInfo(args.rpm)
+        check_result = rpmCheck.get_rpm_info(args.rpm)
         print(check_result)
     elif args.system:
         with Progress() as progress:
