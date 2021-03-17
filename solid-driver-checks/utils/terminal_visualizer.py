@@ -5,19 +5,19 @@ from rich.progress import Progress
 
 class RPMTerminal:
     def __init__(self):
-        self.table = Table(show_header=True,
+        self._table = Table(show_header=True,
                            header_style='bold green', show_lines=True)
-        self.table.add_column('Name', width=32)
-        self.table.add_column('Path', width=64)
-        self.table.add_column('Vendor', width=12)
-        self.table.add_column('Signature', width=28)
-        self.table.add_column('Distribution', width=12)
-        self.table.add_column('Driver Flag: supported')
+        self._table.add_column('Name', width=32)
+        self._table.add_column('Path', width=64)
+        self._table.add_column('Vendor', width=12)
+        self._table.add_column('Signature', width=28)
+        self._table.add_column('Distribution', width=12)
+        self._table.add_column('Driver Flag: supported')
 
     def get_table(self):
-        return self.table
+        return self._table
 
-    def AddRow(self, dataset):
+    def add_row(self, dataset):
         name = dataset[0]
         path = dataset[1]
         vendor = dataset[2]
@@ -38,5 +38,5 @@ class RPMTerminal:
             elif values[1] == 'no' or values[1] == 'Missing':
                 ds_formatting += '[red]' + driver + '[/red]' + '\n'
 
-        self.table.add_row(name, path, vendor,
+        self._table.add_row(name, path, vendor,
                            signature, distribution, ds_formatting)

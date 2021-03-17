@@ -62,15 +62,15 @@ def run_cmd(cmd, sshClient=None, timeout=None):
 
 class RPMReader:
     def __init__(self, logger):
-        self.logger = logger
-        self.columns = ['Name',
-                        'Path',
-                        'Vendor',
-                        'Signature',
-                        'Distribution',
-                        'Driver Flag: supported']
+        self._logger = logger
+        self._columns = ['Name',
+                         'Path',
+                         'Vendor',
+                         'Signature',
+                         'Distribution',
+                         'Driver Flag: supported']
 
-    def get_support_flag_from_rpm(self, rpm: str) -> dict:
+    def _get_support_flag_from_rpm(self, rpm: str) -> dict:
         Path('tmp').mkdir(parents=True, exist_ok=True)
         os.chdir('tmp')
 
@@ -103,6 +103,7 @@ class RPMReader:
                 if values[0].rstrip() == 'supported':
                     found_supported = True
                     driver_supported += str(driver) + ": " + ":".join(values[1:]).lstrip() + "\n"
+
             if found_supported is False:
                 driver_supported += str(driver) + ": Missing" + "\n"
 
@@ -111,8 +112,8 @@ class RPMReader:
 
         return driver_supported
 
-    def format_rpm_info(self, rpm_files,
-                        raw_output, row_handlers, query='all'):
+    def _format_rpm_info(self, rpm_files,
+                         raw_output, row_handlers, query='all'):
         raw_output = str(raw_output, 'utf-8').split("Name        :")
         rpms = raw_output[1:]
 
@@ -134,16 +135,16 @@ class RPMReader:
                 elif values[0].rstrip() == "Vendor":
                     vendor = ":".join(values[1:])
 
-            driver_supported = self.get_support_flag_from_rpm(rpm)
+            driver_supported = self._get_support_flag_from_rpm(rpm)
 
-            if not self.query_filter(driver_supported, query):
+            if not self._query_filter(driver_supported, query):
                 continue
 
             for handler in row_handlers:
                 handler([name, rpm, vendor, signature,
                          distribution, driver_supported])
 
-    def query_filter(self, supported, query):
+    def _query_filter(self, supported, query):
         if query == 'all':
             return True
         elif query == 'suse' and ': yes' in supported:
@@ -155,11 +156,11 @@ class RPMReader:
 
         return False
 
-    def add_row(self, row):
-        self.rpm_df = self.rpm_df.append(pd.Series(row, index=self.columns),
-                                         ignore_index=True)
+    def _add_row(self, row):
+        self._rpm_df = self._rpm_df.append(pd.Series(row, index=self._columns),
+                                           ignore_index=True)
 
-    def GetRPMsInfo(self, path, row_handlers=None, query="all"):
+    def get_rpms_info(self, path, row_handlers=None, query="all"):
         rpm_files = run_cmd('find ' + path + ' -name "*.rpm"')
         rpm_files = str(rpm_files, 'utf-8').splitlines()
         rpm_infos = run_cmd('rpm -qpi --nosignature $(find '
@@ -168,46 +169,46 @@ class RPMReader:
         if row_handlers is None:
             row_handlers = []
 
-        self.rpm_df = pd.DataFrame(columns=self.columns)
-        row_handlers.append(self.add_row)
-        self.format_rpm_info(rpm_files, rpm_infos, row_handlers, query)
+        self._rpm_df = pd.DataFrame(columns=self._columns)
+        row_handlers.append(self._add_row)
+        self._format_rpm_info(rpm_files, rpm_infos, row_handlers, query)
 
-        return self.rpm_df
+        return self._rpm_df
 
-    def GetRPMInfo(self, file):
-        self.rpm_df = pd.DataFrame(columns=self.columns)
+    def get_rpm_info(self, file):
+        self._rpm_df = pd.DataFrame(columns=self._columns)
         rpm_infos = run_cmd('rpm -qpi --nosignature ' + file)
 
-        self.format_rpm_info([file], rpm_infos, [self.add_row])
+        self._format_rpm_info([file], rpm_infos, [self._add_row])
 
-        return self.rpm_df
+        return self._rpm_df
 
 
 class DriverReader:
     def __init__(self, logger, progress):
-        self.logger = logger
-        self.progress = progress
-        self.columns = ['Name',
+        self._logger = logger
+        self._progress = progress
+        self._columns = ['Name',
                         'Path',
                         'Flag: supported',
                         'SUSE Release',
                         'Running',
                         'RPM Information']
 
-    def connect(self, hostname, user, password, ssh_port):
-        self.ssh = paramiko.SSHClient()
-        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    def _connect(self, hostname, user, password, ssh_port):
+        self._ssh = paramiko.SSHClient()
+        self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            self.ssh.connect(hostname=hostname,
+            self._ssh.connect(hostname=hostname,
                              username=user,
                              password=password,
                              port=ssh_port)
             return True
         except paramiko.ssh_exception.SSHException:
-            self.logger.error("Can not connect to server: %s", hostname)
+            self._logger.error("Can not connect to server: %s", hostname)
             return False
 
-    def query_filter(self, supported, query='all'):
+    def _query_filter(self, supported, query='all'):
         if query == 'all':
             return True
         elif query == 'suse' and supported == 'yes':
@@ -221,15 +222,15 @@ class DriverReader:
 
     def get_remote_drivers(self, ip='127.0.0.1', user='', password='',
                            ssh_port=22, query='all'):
-        if not self.connect(ip, user, password, ssh_port):
+        if not self._connect(ip, user, password, ssh_port):
             return None
 
-        drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo(), self.ssh)
-        running_drivers_modinfo = run_cmd(get_cmd_all_running_drivers_modinfo(), self.ssh)
+        drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo(), self._ssh)
+        running_drivers_modinfo = run_cmd(get_cmd_all_running_drivers_modinfo(), self._ssh)
 
-        driver_table = self.fill_driver_info(ip, drivers_modinfo,
-                                             running_drivers_modinfo,
-                                             query, True)
+        driver_table = self._fill_driver_info(ip, drivers_modinfo,
+                                              running_drivers_modinfo,
+                                              query, True)
 
         return driver_table
 
@@ -237,19 +238,19 @@ class DriverReader:
         drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo())
         running_drivers_modinfo = run_cmd(get_cmd_all_running_drivers_modinfo())
 
-        driver_table = self.fill_driver_info('local host',
-                                             drivers_modinfo,
-                                             running_drivers_modinfo, query)
+        driver_table = self._fill_driver_info('local host',
+                                              drivers_modinfo,
+                                              running_drivers_modinfo, query)
 
         return driver_table
 
-    def modinfo_to_list(self, raw_output):
+    def _modinfo_to_list(self, raw_output):
         raw_output = str(raw_output, 'utf-8')
         raw_output = list(raw_output.split('filename:'))
 
         return raw_output[1:]
 
-    def get_driver_files(self, running_driver_info):
+    def _get_driver_files(self, running_driver_info):
         files = []
         for driver in running_driver_info:
             driver = driver.splitlines()
@@ -257,8 +258,8 @@ class DriverReader:
 
         return files
     
-    def fill_driver_rpm_info(self, driver_files,
-                             item_handler, rpm_table, query, remote):
+    def _fill_driver_rpm_info(self, driver_files,
+                              item_handler, rpm_table, query, remote):
         start = 0
         step = 1000
         finished = False
@@ -273,41 +274,41 @@ class DriverReader:
             cmd = 'rpm -qf ' + ' '.join(driver_files[start: end])
             if remote:
                 async_run_cmd(cmd, item_handler,
-                              rpm_table, start, query, self.ssh)
+                              rpm_table, start, query, self._ssh)
             else:
                 async_run_cmd(cmd, item_handler, rpm_table, start, query)
 
             start = end + 1
 
-    def add_row_handler(self, rpm_table, rpm_info, index, query):
+    def _add_row_handler(self, rpm_table, rpm_info, index, query):
         if rpm_info is '':
             return
 
         supported = rpm_table[index]['supported']
-        self.progress.advance(self.task)
-        if self.query_filter(supported, query):
+        self._progress.advance(self._task)
+        if self._query_filter(supported, query):
             row = [rpm_table[index]['name'],
                    rpm_table[index]['path'],
                    supported,
                    rpm_table[index]['suserelease'],
                    rpm_table[index]['running'], rpm_info]
-            self.driver_df = self.driver_df.append(pd.Series(row, index=self.columns), ignore_index=True)
+            self._driver_df = self._driver_df.append(pd.Series(row, index=self._columns), ignore_index=True)
 
-            self.progress.console.print(f"Found driver: {rpm_table[index]['path']}")
+            self._progress.console.print(f"Found driver: {rpm_table[index]['path']}")
 
-    def fill_driver_info(self, ip, drivers_modinfo,
-                         running_drivers_modinfo, query='all', remote=False):
-        drivers_modinfo = set(self.modinfo_to_list(drivers_modinfo))
-        running_drivers_modinfo = set(self.modinfo_to_list(running_drivers_modinfo))
+    def _fill_driver_info(self, ip, drivers_modinfo,
+                          running_drivers_modinfo, query='all', remote=False):
+        drivers_modinfo = set(self._modinfo_to_list(drivers_modinfo))
+        running_drivers_modinfo = set(self._modinfo_to_list(running_drivers_modinfo))
 
         drivers_modinfo = drivers_modinfo.union(running_drivers_modinfo)
         total_drivers = len(drivers_modinfo)
-        self.task = self.progress.add_task(ip + "; total drivers: "
+        self._task = self._progress.add_task(ip + "; total drivers: "
                                            + str(total_drivers),
                                            total=total_drivers)
 
-        driver_files = self.get_driver_files(drivers_modinfo)
-        running_driver_files = self.get_driver_files(running_drivers_modinfo)
+        driver_files = self._get_driver_files(drivers_modinfo)
+        running_driver_files = self._get_driver_files(running_drivers_modinfo)
 
         rpm_table = []
         for driver in drivers_modinfo:
@@ -343,8 +344,8 @@ class DriverReader:
 
             rpm_table.append(rpm_set)
 
-        self.driver_df = pd.DataFrame(columns=self.columns)
-        self.fill_driver_rpm_info(driver_files, self.add_row_handler,
+        self._driver_df = pd.DataFrame(columns=self._columns)
+        self._fill_driver_rpm_info(driver_files, self._add_row_handler,
                                   rpm_table, query, remote)
 
-        return self.driver_df
+        return self._driver_df
