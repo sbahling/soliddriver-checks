@@ -1,7 +1,7 @@
 import pdfkit
 import pandas as pd
 import os
-from dominate.tags import *
+from dominate.tags import html, body, h1, div
 from dominate.util import raw
 from openpyxl.styles import PatternFill, Font
 from openpyxl.styles.differential import DifferentialStyle
@@ -218,6 +218,15 @@ class DriversExporter:
         html_table_formatter = HTMLTableFormatting()
         styles = html_table_formatter.get_style()
         body_format = self._formatting.load_body_format()
+        s = driver_tables.style.\
+            applymap(self._supported_html_format_handler,
+                     subset=pd.IndexSlice[:, ['Flag: supported']]).\
+            applymap(self._running_html_format_handler,
+                     subset=pd.IndexSlice[:, ['Running']]).\
+            applymap(self._rpm_info_html_format_handler,
+                     subset=pd.IndexSlice[:, ['RPM Information']]).hide_index().\
+            set_table_styles(styles)
+
         context = html()
         with context:
             font_family = body_format["font-family"]
@@ -225,18 +234,6 @@ class DriversExporter:
             with body(style=body_style):
                 for key in driver_tables:
                     h1('Solid Driver Checking Result: ' + key)
-
-                    s = driver_tables[key].style.applymap(
-                                self._supported_html_format_handler,
-                                subset=pd.IndexSlice[:, ['Flag: supported']])
-
-                    s = s.applymap(self._running_html_format_handler,
-                                   subset=pd.IndexSlice[:, ['Running']])
-
-                    s = s.applymap(self._rpm_info_html_format_handler,
-                                   subset=pd.IndexSlice[:, ['RPM Information']]).hide_index()
-                    s = s.set_table_styles(styles)
-
                     div(raw(s.render()))
 
         with open(file, 'w') as f:
