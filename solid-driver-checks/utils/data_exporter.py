@@ -218,22 +218,22 @@ class DriversExporter:
         html_table_formatter = HTMLTableFormatting()
         styles = html_table_formatter.get_style()
         body_format = self._formatting.load_body_format()
-        s = driver_tables.style.\
-            applymap(self._supported_html_format_handler,
-                     subset=pd.IndexSlice[:, ['Flag: supported']]).\
-            applymap(self._running_html_format_handler,
-                     subset=pd.IndexSlice[:, ['Running']]).\
-            applymap(self._rpm_info_html_format_handler,
-                     subset=pd.IndexSlice[:, ['RPM Information']]).hide_index().\
-            set_table_styles(styles)
-
         context = html()
         with context:
             font_family = body_format["font-family"]
             body_style = 'font-family: %s;' % font_family
             with body(style=body_style):
-                for key in driver_tables:
-                    h1('Solid Driver Checking Result: ' + key)
+                for label, driver_table in driver_tables.items():
+                    s = driver_table.style.\
+                        applymap(self._supported_html_format_handler,
+                                 subset=pd.IndexSlice[:, ['Flag: supported']]).\
+                        applymap(self._running_html_format_handler,
+                                 subset=pd.IndexSlice[:, ['Running']]).\
+                        applymap(self._rpm_info_html_format_handler,
+                                 subset=pd.IndexSlice[:, ['RPM Information']]).hide_index().\
+                        set_table_styles(styles)
+
+                    h1('Solid Driver Checking Result: %s' % label)
                     div(raw(s.render()))
 
         with open(file, 'w') as f:

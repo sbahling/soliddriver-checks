@@ -4,6 +4,7 @@ from utils import data_exporter
 from utils import data_reader
 import os
 import logging
+import socket
 from rich.logging import RichHandler
 from rich.live import Live
 from utils import terminal_visualizer
@@ -40,9 +41,13 @@ if __name__ == "__main__":
         check_result = rpmCheck.get_rpm_info(args.rpm)
         print(check_result)
     elif args.system:
+        hostname = socket.gethostname()
+        ip = socket.gethostbyname(hostname)
+        label = '%s (%s)' % (hostname, ip)
+        logger.info('Retrieving kernel module data for %s' % label)
         with Progress() as progress:
             driverCheck = data_reader.DriverReader(logger, progress)
-            check_result = driverCheck.get_local_drivers(args.query)
+            check_result = {label: driverCheck.get_local_drivers(args.query)}
         save_to_file = data_exporter.DriversExporter(logger)
         if args.output == 'html':
             save_to_file.to_html(check_result, args.file)
