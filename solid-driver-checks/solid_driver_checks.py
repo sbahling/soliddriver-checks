@@ -7,7 +7,8 @@ import logging
 from rich.logging import RichHandler
 from rich.live import Live
 from utils import terminal_visualizer
-from rich.progress import Progress
+from rich.progress import Progress, BarColumn
+from rich.style import Style
 
 if __name__ == "__main__":
     args = parameters.parameter_parse()

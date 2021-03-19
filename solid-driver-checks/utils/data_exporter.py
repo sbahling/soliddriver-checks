@@ -150,10 +150,21 @@ class RPMsExporter:
     def to_all(self, rpm_table, directory):
         if not os.path.exists(directory):
             os.mkdir(directory)
+        else:
+            excel_file = os.path.join(directory, 'check_result.xlsx')
+            html_file = os.path.join(directory, 'check_result.html')
+            pdf_file = os.path.join(directory, 'check_result.pdf')
 
-        self.to_excel(rpm_table, os.path.join(directory, 'check_result.xlsx'))
-        self.to_html(rpm_table, os.path.join(directory, 'check_result.html'))
-        self.to_pdf(rpm_table, os.path.join(directory, 'check_result.pdf'))
+            if os.path.exists(excel_file):
+                os.remove(excel_file)
+            if os.path.exists(html_file):
+                os.remove(html_file)
+            if os.path.exists(pdf_file):
+                os.remove(pdf_file)
+
+        self.to_excel(rpm_table, excel_file)
+        self.to_html(rpm_table, html_file)
+        self.to_pdf(rpm_table, pdf_file)
 
 
 class DriversExporter:
