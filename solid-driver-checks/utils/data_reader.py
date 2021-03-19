@@ -281,7 +281,7 @@ class DriverReader:
             start = end + 1
 
     def _add_row_handler(self, rpm_table, rpm_info, index, query):
-        if rpm_info is '':
+        if rpm_info == '':
             return
 
         supported = rpm_table[index]['supported']
@@ -294,7 +294,7 @@ class DriverReader:
                    rpm_table[index]['running'], rpm_info]
             self._driver_df = self._driver_df.append(pd.Series(row, index=self._columns), ignore_index=True)
 
-            self._progress.console.print(f"Found driver: {rpm_table[index]['path']}")
+            self._progress.console.print(f"[light_steel_blue]Found driver: {rpm_table[index]['path']}[/light_steel_blue]")
 
     def _fill_driver_info(self, ip, drivers_modinfo,
                           running_drivers_modinfo, query='all', remote=False):
@@ -303,9 +303,11 @@ class DriverReader:
 
         drivers_modinfo = drivers_modinfo.union(running_drivers_modinfo)
         total_drivers = len(drivers_modinfo)
-        self._task = self._progress.add_task(ip + "; total drivers: "
-                                           + str(total_drivers),
-                                           total=total_drivers)
+        self._task = self._progress.add_task("[italic][bold][green] Working on: "
+                                             + ip
+                                             + "; Total Drivers: "
+                                             + str(total_drivers),
+                                             total=total_drivers)
 
         driver_files = self._get_driver_files(drivers_modinfo)
         running_driver_files = self._get_driver_files(running_drivers_modinfo)
@@ -346,6 +348,6 @@ class DriverReader:
 
         self._driver_df = pd.DataFrame(columns=self._columns)
         self._fill_driver_rpm_info(driver_files, self._add_row_handler,
-                                  rpm_table, query, remote)
+                                   rpm_table, query, remote)
 
         return self._driver_df
