@@ -43,7 +43,7 @@ if __name__ == "__main__":
         with Progress() as progress:
             driverCheck = data_reader.DriverReader(logger, progress)
             check_result = driverCheck.get_local_drivers(args.query)
-        save_to_file = data_exporter(logger)
+        save_to_file = data_exporter.DriversExporter(logger)
         if args.output == 'html':
             save_to_file.to_html(check_result, args.file)
         elif args.output == 'excel':

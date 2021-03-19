@@ -331,11 +331,17 @@ class DriversExporter:
         if not os.path.exists(directory):
             os.mkdir(directory)
         else:
-            os.rmdir(directory)
+            excel_file = os.path.join(directory, 'check_result.xlsx')
+            html_file = os.path.join(directory, 'check_result.html')
+            pdf_file = os.path.join(directory, 'check_result.pdf')
 
-        self.to_excel(driver_tables,
-                      os.path.join(directory, 'check_result.xlsx'))
-        self.to_html(driver_tables,
-                     os.path.join(directory, 'check_result.html'))
-        self.to_pdf(driver_tables,
-                    os.path.join(directory, 'check_result.pdf'))
+            if os.path.exists(excel_file):
+                os.remove(excel_file)
+            if os.path.exists(html_file):
+                os.remove(html_file)
+            if os.path.exists(pdf_file):
+                os.remove(pdf_file)
+
+        self.to_excel(driver_tables, excel_file)
+        self.to_html(driver_tables, html_file)
+        self.to_pdf(driver_tables, pdf_file)
