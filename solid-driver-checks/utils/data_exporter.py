@@ -1,7 +1,7 @@
 import pdfkit
 import pandas as pd
 import os
-from dominate.tags import *
+from dominate.tags import html, body, h1, div
 from dominate.util import raw
 from openpyxl.styles import PatternFill, Font
 from openpyxl.styles.differential import DifferentialStyle
@@ -223,20 +223,17 @@ class DriversExporter:
             font_family = body_format["font-family"]
             body_style = 'font-family: %s;' % font_family
             with body(style=body_style):
-                for key in driver_tables:
-                    h1('Solid Driver Checking Result: ' + key)
+                for label, driver_table in driver_tables.items():
+                    s = driver_table.style.\
+                        applymap(self._supported_html_format_handler,
+                                 subset=pd.IndexSlice[:, ['Flag: supported']]).\
+                        applymap(self._running_html_format_handler,
+                                 subset=pd.IndexSlice[:, ['Running']]).\
+                        applymap(self._rpm_info_html_format_handler,
+                                 subset=pd.IndexSlice[:, ['RPM Information']]).hide_index().\
+                        set_table_styles(styles)
 
-                    s = driver_tables[key].style.applymap(
-                                self._supported_html_format_handler,
-                                subset=pd.IndexSlice[:, ['Flag: supported']])
-
-                    s = s.applymap(self._running_html_format_handler,
-                                   subset=pd.IndexSlice[:, ['Running']])
-
-                    s = s.applymap(self._rpm_info_html_format_handler,
-                                   subset=pd.IndexSlice[:, ['RPM Information']]).hide_index()
-                    s = s.set_table_styles(styles)
-
+                    h1('Solid Driver Checking Result: %s' % label)
                     div(raw(s.render()))
 
         with open(file, 'w') as f:
