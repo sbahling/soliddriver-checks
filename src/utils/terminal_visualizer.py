@@ -39,4 +39,4 @@ class RPMTerminal:
                 ds_formatting += '[red]' + driver + '[/red]' + '\n'
 
         self._table.add_row(name, path, vendor,
-                           signature, distribution, ds_formatting)
+                            signature, distribution, ds_formatting)
