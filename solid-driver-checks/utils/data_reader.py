@@ -1,7 +1,6 @@
 import subprocess
 from pathlib import Path
 import os
-import pathlib
 import shutil
 import paramiko
 import pandas as pd
@@ -82,7 +81,7 @@ class RPMReader:
         rpm_unpack.wait()
 
         driver_supported = ""
-        rpm_dir = pathlib.Path('.')
+        rpm_dir = Path('.')
         drivers = tuple(rpm_dir.rglob('*.ko'))
         if len(drivers) < 1:
             os.chdir('../')
@@ -175,11 +174,11 @@ class RPMReader:
 
         return self._rpm_df
 
-    def get_rpm_info(self, file):
+    def get_rpm_info(self, rpmfile):
         self._rpm_df = pd.DataFrame(columns=self._columns)
-        rpm_infos = run_cmd('rpm -qpi --nosignature ' + file)
+        rpm_infos = run_cmd('rpm -qpi --nosignature %s' % rpmfile)
 
-        self._format_rpm_info([file], rpm_infos, [self._add_row])
+        self._format_rpm_info([rpmfile.name], rpm_infos, [self._add_row])
 
         return self._rpm_df
 
@@ -281,7 +280,7 @@ class DriverReader:
             start = end + 1
 
     def _add_row_handler(self, rpm_table, rpm_info, index, query):
-        if rpm_info is '':
+        if rpm_info == '':
             return
 
         supported = rpm_table[index]['supported']
