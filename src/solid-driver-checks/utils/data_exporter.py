@@ -82,6 +82,7 @@ class RPMsExporter:
         styles = tableFormatter.get_style()
 
         rpm_table['Driver Flag: supported'] = rpm_table['Driver Flag: supported'].str.replace('\n', '</br>')
+        rpm_table['Symbols Check'] = rpm_table['Symbols Check'].str.replace('\n', '</br>')
 
         s = rpm_table.style.applymap(self._supported_formatting,
                                      subset=pd.IndexSlice[:, ['Driver Flag: supported']],
@@ -148,13 +149,13 @@ class RPMsExporter:
         os.remove('.tmp.rpms.html')
 
     def to_all(self, rpm_table, directory):
+        excel_file = os.path.join(directory, 'check_result.xlsx')
+        html_file = os.path.join(directory, 'check_result.html')
+        pdf_file = os.path.join(directory, 'check_result.pdf')
+
         if not os.path.exists(directory):
             os.mkdir(directory)
         else:
-            excel_file = os.path.join(directory, 'check_result.xlsx')
-            html_file = os.path.join(directory, 'check_result.html')
-            pdf_file = os.path.join(directory, 'check_result.pdf')
-
             if os.path.exists(excel_file):
                 os.remove(excel_file)
             if os.path.exists(html_file):
@@ -336,13 +337,13 @@ class DriversExporter:
         os.remove('.tmp.rpms.html')
 
     def to_all(self, driver_tables, directory):
+        excel_file = os.path.join(directory, 'check_result.xlsx')
+        html_file = os.path.join(directory, 'check_result.html')
+        pdf_file = os.path.join(directory, 'check_result.pdf')
+
         if not os.path.exists(directory):
             os.mkdir(directory)
         else:
-            excel_file = os.path.join(directory, 'check_result.xlsx')
-            html_file = os.path.join(directory, 'check_result.html')
-            pdf_file = os.path.join(directory, 'check_result.pdf')
-
             if os.path.exists(excel_file):
                 os.remove(excel_file)
             if os.path.exists(html_file):
