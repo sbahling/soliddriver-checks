@@ -6,7 +6,7 @@ from rich.progress import Progress
 class RPMTerminal:
     def __init__(self):
         self._table = Table(show_header=True,
-                           header_style='bold green', show_lines=True)
+                            header_style='bold green', show_lines=True)
         self._table.add_column('Name', width=32)
         self._table.add_column('Path', width=64)
         self._table.add_column('Vendor', width=12)
@@ -39,4 +39,4 @@ class RPMTerminal:
                 ds_formatting += '[red]' + driver + '[/red]' + '\n'
 
         self._table.add_row(name, path, vendor,
-                           signature, distribution, ds_formatting)
+                            signature, distribution, ds_formatting)
