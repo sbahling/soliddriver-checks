@@ -160,10 +160,9 @@ class RPMReader:
                                            ignore_index=True)
 
     def get_rpms_info(self, path, row_handlers=None, query="all"):
-        rpm_files = run_cmd('find ' + path + ' -name "*.rpm"')
+        rpm_files = run_cmd('find %s -name "*.rpm"' % path)
         rpm_files = str(rpm_files, 'utf-8').splitlines()
-        rpm_infos = run_cmd('rpm -qpi --nosignature $(find '
-                            + path + ' -name "*.rpm")')
+        rpm_infos = run_cmd('rpm -qpi --nosignature $(find %s -name "*.rpm")' % path)
 
         if row_handlers is None:
             row_handlers = []
