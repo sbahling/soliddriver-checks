@@ -1,4 +1,4 @@
-# solid-driver-checks
+# soliddriver-checks
 
 A tool for ```RPM(s)``` and ```installed/running drivers``` checking, with this tool, users can have an overview of their RPM(s) and drivers status:
 
