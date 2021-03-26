@@ -1,13 +1,6 @@
-import json
 from utils import data_reader
 from rich.progress import Progress
 from paramiko.ssh_exception import NoValidConnectionsError
-
-
-def get_remote_server_config(file):
-    with open(file) as jf:
-        servers = json.load(jf)
-        return servers['servers']
 
 
 def check_remote_servers(logger, servers):
