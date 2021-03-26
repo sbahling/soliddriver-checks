@@ -5,6 +5,9 @@ import shutil
 import paramiko
 import pandas as pd
 import select
+import re
+from collections import namedtuple
+
 
 def get_cmd_all_drivers_modinfo():
     return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$")'
@@ -67,9 +70,76 @@ class RPMReader:
                          'Vendor',
                          'Signature',
                          'Distribution',
-                         'Driver Flag: supported']
+                         'Driver Flag: supported',
+                         'Symbols Check']
 
-    def _get_support_flag_from_rpm(self, rpm: str) -> dict:
+    def _driver_symbols_check(self, rpm_symbols, driver):
+        symvers = run_cmd('/usr/sbin/modprobe --dump-modversions %s' % driver)
+
+        result = []
+        for line in symvers.splitlines():
+            line = str(line, 'utf-8')
+            chksum, sym = line.split()
+            chksum = hex(int(chksum, base=16))
+
+            req = rpm_symbols.get(sym, None)
+            if req is None:
+                result.append('Symbol %s not found in rpm requires' % sym)
+                continue
+
+            if req.checksum != chksum:
+                result.append('Symbol checksum does not match, module depends on %s, rpm requires %s' % (chksum, req.checksum))
+                continue
+
+        return result
+
+    def _get_rpm_symbols(self, rpm):
+        KernelSym = namedtuple('KernelSym', 'kernel_flavor symbol checksum')
+        symver_re = re.compile(r'ksym\((.*):(.*)\) = (.+)')
+        raw_symbols = run_cmd('rpm -q --requires %s' % rpm)
+
+        mod_reqs = {}
+        for line in raw_symbols.splitlines():
+            line = str(line, 'utf-8')
+            result = symver_re.match(line)
+            if result:
+                flavor, sym, chksum = result.groups()
+                chksum = hex(int(chksum, base=16))
+                mod_reqs[sym] = KernelSym(kernel_flavor=flavor,
+                                          symbol=sym, checksum=chksum)
+
+        return mod_reqs
+
+    def _get_driver_supported(self, driver):
+        raw_info = run_cmd('/usr/sbin/modinfo %s' % driver)
+        raw_info = str(raw_info, 'utf-8')
+        info_list = raw_info.splitlines()
+        for item in info_list:
+            values = item.split(':')
+            if len(values) < 2:
+                continue
+
+            if values[0].rstrip() == 'supported':
+                return ":".join(values[1:]).lstrip()
+
+        return "Missing"
+
+    def _drivers_terminal_format(self, drivers):
+        supported = ""
+        symbols = ""
+        for driver in drivers:
+            supported += "%s : %s\n" % (driver, drivers[driver]['supported'])
+            mismatched_symbols = drivers[driver]['mismatch-symbols']
+            if len(mismatched_symbols) > 0:
+                symbols += "%s :\n" % driver
+                for sym in mismatched_symbols:
+                    symbols += "  %s\n" % sym
+
+        return supported, symbols
+
+    def _driver_checks(self, rpm: str):
+        mod_reqs = self._get_rpm_symbols(rpm)
+
         Path('tmp').mkdir(parents=True, exist_ok=True)
         os.chdir('tmp')
 
@@ -80,36 +150,28 @@ class RPMReader:
                                       stderr=subprocess.PIPE)
         rpm_unpack.wait()
 
-        driver_supported = ""
         rpm_dir = Path('.')
-        drivers = tuple(rpm_dir.rglob('*.ko'))
+        files = tuple(rpm_dir.rglob('*.*'))
+        drivers = [i for i in files if re.search(r'\.(ko|xz\.ko)$', str(i))]
+        result = dict()
+
         if len(drivers) < 1:
             os.chdir('../')
             shutil.rmtree('tmp')
 
-            return driver_supported
+            return None
 
         for driver in drivers:
-            raw_info = run_cmd('/usr/sbin/modinfo %s' % driver)
-            raw_info = str(raw_info, 'utf-8')
-            info_list = raw_info.splitlines()
-            found_supported = False
-            for item in info_list:
-                values = item.split(':')
-                if len(values) < 2:
-                    continue
+            item = dict()
+            item['mismatch-symbols'] = self._driver_symbols_check(mod_reqs, driver)
+            item['supported'] = self._get_driver_supported(driver)
 
-                if values[0].rstrip() == 'supported':
-                    found_supported = True
-                    driver_supported += str(driver) + ": " + ":".join(values[1:]).lstrip() + "\n"
-
-            if found_supported is False:
-                driver_supported += str(driver) + ": Missing" + "\n"
+            result[str(driver)] = item
 
         os.chdir('../')
         shutil.rmtree('tmp')
 
-        return driver_supported
+        return result
 
     def _format_rpm_info(self, rpm_files,
                          raw_output, row_handlers, query='all'):
@@ -134,14 +196,19 @@ class RPMReader:
                 elif values[0].rstrip() == "Vendor":
                     vendor = ":".join(values[1:])
 
-            driver_supported = self._get_support_flag_from_rpm(rpm)
+            driver_checks = self._driver_checks(rpm)
 
-            if not self._query_filter(driver_supported, query):
+            supported = ""
+            symbols = ""
+            if driver_checks is not None:
+                supported, symbols = self._drivers_terminal_format(driver_checks)
+
+            if not self._query_filter(supported, query):
                 continue
 
             for handler in row_handlers:
                 handler([name, rpm, vendor, signature,
-                         distribution, driver_supported])
+                         distribution, supported, symbols])
 
     def _query_filter(self, supported, query):
         if query == 'all':

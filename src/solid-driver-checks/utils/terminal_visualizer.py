@@ -13,6 +13,7 @@ class RPMTerminal:
         self._table.add_column('Signature', width=28)
         self._table.add_column('Distribution', width=12)
         self._table.add_column('Driver Flag: supported')
+        self._table.add_column('Symbols Check')
 
     def get_table(self):
         return self._table
@@ -24,6 +25,7 @@ class RPMTerminal:
         signature = dataset[3]
         distribution = dataset[4]
         supported = dataset[5]
+        symbols = dataset[6]
 
         ds_formatting = ''
         for driver in supported.split('\n'):
@@ -39,4 +41,4 @@ class RPMTerminal:
                 ds_formatting += '[red]' + driver + '[/red]' + '\n'
 
         self._table.add_row(name, path, vendor,
-                            signature, distribution, ds_formatting)
+                            signature, distribution, ds_formatting, symbols)
