@@ -1,17 +1,18 @@
 import click
 import json
-from utils import remote_check
-from utils import data_exporter
-from utils import data_reader
+from .utils import remote_check
+from .utils import data_exporter
+from .utils import data_reader
+from .utils import terminal_visualizer
 import os
 import logging
 import socket
 from pathlib import Path
 from rich.logging import RichHandler
 from rich.live import Live
-from utils import terminal_visualizer
 from rich.progress import Progress, BarColumn
 from rich.style import Style
+
 
 QUERY_TYPES = ['suse', 'other', 'unknown', 'all']
 FORMAT_TYPES = {'html': '.html',
