@@ -9,12 +9,15 @@ from openpyxl import load_workbook
 from openpyxl.formatting.rule import Rule
 import json
 import time
+import importlib_resources
 
 
 class FormatConfig:
-    def __init__(self, config_file):
-        with open(config_file) as jf:
-            self._formatting = json.load(jf)
+    def __init__(self):
+        config = importlib_resources.files('soliddriver_checks') / "config"
+        conf_buffer = (config / "soliddriver-checks.conf").read_text()
+
+        self._formatting = json.loads(conf_buffer)
 
     def load_body_format(self):
         return self._formatting["body"]
@@ -33,8 +36,8 @@ class FormatConfig:
 
 
 class HTMLTableFormatting:
-    def __init__(self, formatting_config_file='config/color.default.json'):
-        self._formatting = FormatConfig(formatting_config_file)
+    def __init__(self):
+        self._formatting = FormatConfig()
 
     def get_style(self):
         table_formatting = self._formatting.load_table_format()
@@ -58,10 +61,9 @@ class HTMLTableFormatting:
 
 
 class RPMsExporter:
-    def __init__(self, logger,
-                 formatting_config_file='config/color.default.json'):
+    def __init__(self, logger):
         self._logger = logger
-        self._formatting = FormatConfig(formatting_config_file)
+        self._formatting = FormatConfig()
 
     def _supported_formatting(self, value):
         formatting = self._formatting.load_support_flag_format()
@@ -169,10 +171,9 @@ class RPMsExporter:
 
 
 class DriversExporter:
-    def __init__(self, logger,
-                 formatting_config_file='config/color.default.json'):
+    def __init__(self, logger):
         self._logger = logger
-        self._formatting = FormatConfig(formatting_config_file)
+        self._formatting = FormatConfig()
 
     def _supported_color(self, value):
         if value == 'yes':

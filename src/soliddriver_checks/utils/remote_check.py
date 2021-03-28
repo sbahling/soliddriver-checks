@@ -1,4 +1,4 @@
-from utils import data_reader
+from .data_reader import DriverReader
 from rich.progress import Progress
 from paramiko.ssh_exception import NoValidConnectionsError
 
@@ -12,7 +12,7 @@ def check_remote_servers(logger, servers):
         logger.info("Start to analysis server: %s", server['ip'])
         try:
             with Progress() as progress:
-                reader = data_reader.DriverReader(logger, progress)
+                reader = DriverReader(logger, progress)
                 drivers = reader.get_remote_drivers(ip=server['ip'],
                                                     user=server['user'],
                                                     password=server['password'],
