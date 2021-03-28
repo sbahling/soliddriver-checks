@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="soliddriver-checks",
-    version="0.0.16",
+    version="0.0.17",
     author="Hui-Zhi Zhao",
     author_email="hui.zhi.zhao@suse.com",
     description=("Check RPM(s) and Drivers information"),

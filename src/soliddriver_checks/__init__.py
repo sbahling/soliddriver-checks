@@ -179,8 +179,13 @@ def run(check_target, output, out_format, query):
         export(exporter, check_result, out_format, dst)
 
     elif target.system:
-        hostname = socket.gethostname()
-        ip = socket.gethostbyname(hostname)
+        try:
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+        except socket.gaierror as e:
+            logger.warning(f"Get ip by hostname: {hostname} failed: {e}")
+        finally:
+            ip = "127.0.0.1"
         label = '%s (%s)' % (hostname, ip)
         logger.info('Retrieving kernel module data for %s' % label)
         with Progress() as progress:
