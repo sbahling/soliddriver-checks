@@ -14,7 +14,15 @@ A tool for ```RPM(s)``` and ```installed/running drivers``` checking, with this 
   - yes: This driver is supported by SUSE. But please confirm with SUSE if you're not sure if it's really supported by SUSE or the auther of the driver just put a ```yes``` on it.
   - external: This driver is supported by both vendor and SUSE.
   - Missing or no: The driver is not supported by SUSE, please contact the one who provide it to you for any issues.
-  
+
+## Installation
+
+From pypi: ```pip install soliddriver-checks```
+
+From RPM: the rpms can be found on [build.opensuse.org](https://build.opensuse.org/package/show/home:huizhizhao/soliddriver-checks)
+
+## Usage
+
 ```
 Usage: soliddriver-checks [OPTIONS] [CHECK_TARGET]
 
@@ -49,7 +57,7 @@ Options:
                                   appended matching on the output format
 ```
 
-# Examples:
+## Examples:
  - Check RPMs: </br>
    ```bash
    # generate a html report for your rpm checks as default output.
