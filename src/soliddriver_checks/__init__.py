@@ -177,6 +177,7 @@ def run(check_target, output, out_format, query):
                 query=query)
         exporter = data_exporter.RPMsExporter(logger)
         export(exporter, check_result, out_format, dst)
+        logger.info("[green]Check is completed![/] The result has been saved to [bold green]%s[/]" % dst, extra={"markup": True})
 
     elif target.system:
         try:
@@ -193,12 +194,14 @@ def run(check_target, output, out_format, query):
             check_result = {label: driverCheck.get_local_drivers(query)}
         exporter = data_exporter.DriversExporter(logger)
         export(exporter, check_result, out_format, dst)
+        logger.info("[green]Check is completed![/] The result has been saved to [bold green]%s[/]" % dst, extra={"markup": True})
 
     elif target.config is not None:
         servers = target.config['servers']
         check_result = remote_check.check_remote_servers(logger, servers)
         exporter = data_exporter.DriversExporter(logger)
         export(exporter, check_result, out_format, dst)
+        logger.info("[green]Check is completed[/], please see the results in [bold green]%s[/]" % dst.parent, extra={"markup": True})
 
 
 if __name__ == '__main__':

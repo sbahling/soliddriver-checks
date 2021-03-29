@@ -76,7 +76,9 @@ class RPMReader:
     def _driver_symbols_check(self, rpm_symbols, driver):
         symvers = run_cmd('/usr/sbin/modprobe --dump-modversions %s' % driver)
 
-        result = []
+        result = dict()
+        result['unfound'] = []
+        result['checksum-mismatch'] = []
         for line in symvers.splitlines():
             line = str(line, 'utf-8')
             chksum, sym = line.split()
@@ -84,11 +86,13 @@ class RPMReader:
 
             req = rpm_symbols.get(sym, None)
             if req is None:
-                result.append('Symbol %s not found in rpm requires' % sym)
+                result['unfound'].append(sym)
+                # result.append('Symbol %s not found in rpm requires' % sym)
                 continue
 
             if req.checksum != chksum:
-                result.append('Symbol checksum does not match, module depends on %s, rpm requires %s' % (chksum, req.checksum))
+                result['checksum-mismatch'].append('rpm checksum: %s, driver checksum: %s' % (chksum, req.checksum))
+                # result.append('Symbol checksum does not match, module depends on %s, rpm requires %s' % (chksum, req.checksum))
                 continue
 
         return result
@@ -129,11 +133,18 @@ class RPMReader:
         symbols = ""
         for driver in drivers:
             supported += "%s : %s\n" % (driver, drivers[driver]['supported'])
-            mismatched_symbols = drivers[driver]['mismatch-symbols']
-            if len(mismatched_symbols) > 0:
-                symbols += "%s :\n" % driver
-                for sym in mismatched_symbols:
-                    symbols += "  %s\n" % sym
+            syms = drivers[driver]['symbols']
+
+            if len(syms['unfound']) == 0 and len(syms['checksum-mismatch']) == 0:
+                continue
+            else:
+                symbols += "********************\nSymbols error founded in driver: %s\n" % driver
+
+            if len(syms['unfound']) > 0:
+                symbols += "Symbols not found in rpm requires:\n %s\n" % syms['unfound']
+
+            if len(syms['checksum-mismatch']) > 0:
+                symbols += "Symbol checksum does not match:\n %s\n" % syms['checksum-mismatch']
 
         return supported, symbols
 
@@ -163,7 +174,7 @@ class RPMReader:
 
         for driver in drivers:
             item = dict()
-            item['mismatch-symbols'] = self._driver_symbols_check(mod_reqs, driver)
+            item['symbols'] = self._driver_symbols_check(mod_reqs, driver)
             item['supported'] = self._get_driver_supported(driver)
 
             result[str(driver)] = item
