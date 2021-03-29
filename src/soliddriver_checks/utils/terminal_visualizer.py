@@ -40,5 +40,8 @@ class RPMTerminal:
             elif values[1] == 'no' or values[1] == 'Missing':
                 ds_formatting += '[red]' + driver + '[/red]' + '\n'
 
+        if symbols != '':
+            symbols = '[red]' + symbols + '[/red]'
+
         self._table.add_row(name, path, vendor,
                             signature, distribution, ds_formatting, symbols)

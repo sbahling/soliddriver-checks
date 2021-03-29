@@ -33,6 +33,9 @@ class FormatConfig:
 
     def load_running_format(self):
         return self._formatting['highlight']['running']
+    
+    def load_symbol_format(self):
+        return self._formatting['highlight']['symbol']
 
 
 class HTMLTableFormatting:
@@ -65,7 +68,7 @@ class RPMsExporter:
         self._logger = logger
         self._formatting = FormatConfig()
 
-    def _supported_formatting(self, value):
+    def _supported_render(self, value):
         formatting = self._formatting.load_support_flag_format()
         bgcolor_missing = formatting['Missing']['background-color']
         bgcolor_yes = formatting['yes']['background-color']
@@ -79,6 +82,15 @@ class RPMsExporter:
         else:
             return 'background-color: white'
 
+    def _symbol_render(self, value):
+        if value == '':
+            return ''
+
+        formatting = self._formatting.load_symbol_format()
+        bgcolor = formatting['mismatch']['background-color']
+        return 'background-color: %s' % bgcolor
+
+
     def to_html(self, rpm_table, file):
         tableFormatter = HTMLTableFormatting()
         styles = tableFormatter.get_style()
@@ -86,11 +98,14 @@ class RPMsExporter:
         rpm_table['Driver Flag: supported'] = rpm_table['Driver Flag: supported'].str.replace('\n', '</br>')
         rpm_table['Symbols Check'] = rpm_table['Symbols Check'].str.replace('\n', '</br>')
 
-        s = rpm_table.style.applymap(self._supported_formatting,
-                                     subset=pd.IndexSlice[:, ['Driver Flag: supported']],
-                                     ).hide_index()
-
-        s = s.set_table_styles(styles)
+        s = rpm_table.style.\
+            applymap(self._supported_render,
+                     subset=pd.IndexSlice[:, ['Driver Flag: supported']],
+                    ).hide_index().\
+            applymap(self._symbol_render,
+                     subset=pd.IndexSlice[:, ['Symbols Check']],
+                    ).hide_index().\
+            set_table_styles(styles)
 
         with open(file, 'w') as f:
             f.write(s.render())
@@ -114,7 +129,7 @@ class RPMsExporter:
         if records < 1:
             workbook.save(file)
 
-        area = 'F2:F' + str(records)
+        support_area = 'F2:F' + str(records)
         support_flag_format = self._formatting.load_support_flag_format()
         na_text = Font(color=support_flag_format['Missing']['font-color'])
         na_fill = PatternFill(bgColor=support_flag_format['Missing']['background-color'])
@@ -136,12 +151,24 @@ class RPMsExporter:
                                      operator='containsText',
                                      text='yes', dxf=yes)
 
-        worksheet.conditional_formatting.add(area,
+        worksheet.conditional_formatting.add(support_area,
                                              support_flag_na_rule)
-        worksheet.conditional_formatting.add(area,
+        worksheet.conditional_formatting.add(support_area,
                                              support_flag_external_rule)
-        worksheet.conditional_formatting.add(area,
+        worksheet.conditional_formatting.add(support_area,
                                              support_flag_yes_rule)
+
+        sym_area = 'G2:G' + str(records)
+        sym_format = self._formatting.load_symbol_format()
+        mismatch_text = Font(color=sym_format['mismatch']['font-color'])
+        mismatch_fill = PatternFill(bgColor=sym_format['mismatch']['background-color'])
+        mismatch = DifferentialStyle(font=mismatch_text, fill=mismatch_fill)
+
+        mismatch_rule = Rule(type='containsText',
+                             operator='containsText',
+                             text='Symbols error founded', dxf=mismatch)
+
+        worksheet.conditional_formatting.add(sym_area, mismatch_rule)
 
         workbook.save(file)
 
