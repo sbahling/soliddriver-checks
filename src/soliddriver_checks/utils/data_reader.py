@@ -1,12 +1,12 @@
 import subprocess
 from pathlib import Path
 import os
-import shutil
 import paramiko
 import pandas as pd
 import select
 import re
 from collections import namedtuple
+import tempfile
 
 
 def get_cmd_all_drivers_modinfo():
@@ -151,24 +151,25 @@ class RPMReader:
     def _driver_checks(self, rpm: str):
         mod_reqs = self._get_rpm_symbols(rpm)
 
-        Path('tmp').mkdir(parents=True, exist_ok=True)
-        os.chdir('tmp')
+        tmp = tempfile.TemporaryDirectory()
+        # Path('tmp').mkdir(parents=True, exist_ok=True)
 
-        command = 'rpm2cpio %s | cpio -idmv' % rpm
+        command = 'rpm2cpio %s | cpio -idmv -D %s' % (rpm, tmp.name)
         rpm_unpack = subprocess.Popen(command,
                                       shell=True,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
         rpm_unpack.wait()
 
-        rpm_dir = Path('.')
+        rpm_dir = Path(tmp.name)
         files = tuple(rpm_dir.rglob('*.*'))
         drivers = [i for i in files if re.search(r'\.(ko|xz\.ko)$', str(i))]
         result = dict()
 
         if len(drivers) < 1:
-            os.chdir('../')
-            shutil.rmtree('tmp')
+            # os.chdir('../')
+            # shutil.rmtree('tmp')
+            tmp.cleanup()
 
             return None
 
@@ -177,10 +178,13 @@ class RPMReader:
             item['symbols'] = self._driver_symbols_check(mod_reqs, driver)
             item['supported'] = self._get_driver_supported(driver)
 
-            result[str(driver)] = item
+            dpath = str(driver)
+            dpath = dpath[dpath.startswith(tmp.name) + len(tmp.name) - 1:]
+            result[dpath] = item
 
-        os.chdir('../')
-        shutil.rmtree('tmp')
+        # os.chdir('../')
+        # shutil.rmtree('tmp')
+        tmp.cleanup()
 
         return result
 
@@ -265,20 +269,20 @@ class DriverReader:
         self._logger = logger
         self._progress = progress
         self._columns = ['Name',
-                        'Path',
-                        'Flag: supported',
-                        'SUSE Release',
-                        'Running',
-                        'RPM Information']
+                         'Path',
+                         'Flag: supported',
+                         'SUSE Release',
+                         'Running',
+                         'RPM Information']
 
     def _connect(self, hostname, user, password, ssh_port):
         self._ssh = paramiko.SSHClient()
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
             self._ssh.connect(hostname=hostname,
-                             username=user,
-                             password=password,
-                             port=ssh_port)
+                              username=user,
+                              password=password,
+                              port=ssh_port)
             return True
         except paramiko.ssh_exception.SSHException:
             self._logger.error("Can not connect to server: %s", hostname)

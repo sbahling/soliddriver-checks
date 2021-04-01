@@ -12,6 +12,7 @@ from rich.logging import RichHandler
 from rich.live import Live
 from rich.progress import Progress, BarColumn
 from rich.style import Style
+from .version import __VERSION__
 
 
 QUERY_TYPES = ['suse', 'other', 'unknown', 'all']
@@ -127,7 +128,8 @@ def dst_is_ok(dst, out_format):
                    'specified. In either case, the file extension will '
                    'be automatically appended matching on the output format'
               )
-def run(check_target, output, out_format, query):
+@click.option('--version', is_flag=True)
+def run(check_target, output, out_format, query, version):
     """Run checks against CHECK_TARGET.
 
     \b
@@ -139,6 +141,10 @@ def run(check_target, output, out_format, query):
 
       default is local system
     """
+
+    if version:
+        print(__VERSION__)
+        exit()
 
     FORMAT = '%(asctime)-15s %(message)s'
     logging.basicConfig(format=FORMAT, handlers=[RichHandler()])
