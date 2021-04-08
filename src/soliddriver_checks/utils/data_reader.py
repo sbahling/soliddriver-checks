@@ -7,6 +7,7 @@ import select
 import re
 from collections import namedtuple
 import tempfile
+from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 
 
 def get_cmd_all_drivers_modinfo():
@@ -274,6 +275,7 @@ class DriverReader:
                          'SUSE Release',
                          'Running',
                          'RPM Information']
+        self._ssh = None
 
     def _connect(self, hostname, user, password, ssh_port):
         self._ssh = paramiko.SSHClient()
@@ -284,9 +286,12 @@ class DriverReader:
                               password=password,
                               port=ssh_port)
             return True
-        except paramiko.ssh_exception.SSHException:
-            self._logger.error("Can not connect to server: %s", hostname)
-            return False
+        except NoValidConnectionsError as e:
+            self._progress.console.print(f"[bold red]Can not connect to {hostname}, failed: {e}[/]")
+        except SSHException as e:
+            self._progress.console.print(f"[bold red]Can not connect to {hostname}, failed: {e}[/]")
+
+        return False
 
     def _query_filter(self, supported, query='all'):
         if query == 'all':
@@ -305,12 +310,19 @@ class DriverReader:
         if not self._connect(ip, user, password, ssh_port):
             return None
 
-        drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo(), self._ssh)
-        running_drivers_modinfo = run_cmd(get_cmd_all_running_drivers_modinfo(), self._ssh)
+        try:
+            drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo(), self._ssh)
+            running_drivers_modinfo = run_cmd(get_cmd_all_running_drivers_modinfo(), self._ssh)
 
-        driver_table = self._fill_driver_info(ip, drivers_modinfo,
-                                              running_drivers_modinfo,
-                                              query, True)
+            driver_table = self._fill_driver_info(ip, drivers_modinfo,
+                                                  running_drivers_modinfo,
+                                                  query, True)
+        except NoValidConnectionsError as e:
+            self._progress.console.print(f"[bold red]Connect to {ip} failed : {e}[/]")
+        finally:
+            pass
+
+        self._progress.update(self._task, visible=False)
 
         return driver_table
 
@@ -374,7 +386,8 @@ class DriverReader:
                    rpm_table[index]['running'], rpm_info]
             self._driver_df = self._driver_df.append(pd.Series(row, index=self._columns), ignore_index=True)
 
-            self._progress.console.print(f"[light_steel_blue]Found driver: {rpm_table[index]['path']}[/light_steel_blue]")
+            if self._ssh is None:
+                self._progress.console.print(f"[light_steel_blue]Found driver: {rpm_table[index]['path']}[/light_steel_blue]")
 
     def _fill_driver_info(self, ip, drivers_modinfo,
                           running_drivers_modinfo, query='all', remote=False):
