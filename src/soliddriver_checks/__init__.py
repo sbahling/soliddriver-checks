@@ -10,7 +10,7 @@ import socket
 from pathlib import Path
 from rich.logging import RichHandler
 from rich.live import Live
-from rich.progress import Progress, BarColumn
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.style import Style
 from .version import __VERSION__
 
@@ -183,7 +183,9 @@ def run(check_target, output, out_format, query, version):
                 query=query)
         exporter = data_exporter.RPMsExporter(logger)
         export(exporter, check_result, out_format, dst)
-        logger.info("[green]Check is completed![/] The result has been saved to [bold green]%s[/]" % dst, extra={"markup": True})
+        logger.info('[green]Check is completed![/]'
+                    'The result has been saved to '
+                    '[bold green]%s[/]' % dst, extra={"markup": True})
 
     elif target.system:
         try:
@@ -195,19 +197,27 @@ def run(check_target, output, out_format, query, version):
             ip = "127.0.0.1"
         label = '%s (%s)' % (hostname, ip)
         logger.info('Retrieving kernel module data for %s' % label)
-        with Progress() as progress:
+        progress = Progress("{task.description}",
+                            SpinnerColumn(),
+                            BarColumn(),
+                            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),)
+        with progress:
             driverCheck = data_reader.DriverReader(logger, progress)
             check_result = {label: driverCheck.get_local_drivers(query)}
         exporter = data_exporter.DriversExporter(logger)
         export(exporter, check_result, out_format, dst)
-        logger.info("[green]Check is completed![/] The result has been saved to [bold green]%s[/]" % dst, extra={"markup": True})
+        progress.console.print('[green]Check is completed![/]'
+                               'The result has been saved to '
+                               '[bold green]%s[/]' % dst)
 
     elif target.config is not None:
         servers = target.config['servers']
         check_result = remote_check.check_remote_servers(logger, servers)
         exporter = data_exporter.DriversExporter(logger)
         export(exporter, check_result, out_format, dst)
-        logger.info("[green]Check is completed[/], please see the results in [bold green]%s[/]" % dst.parent, extra={"markup": True})
+        logger.info('[green]Check is completed[/]'
+                    'Please see the results in [bold green]%s[/]' % dst.parent,
+                    extra={"markup": True})
 
 
 if __name__ == '__main__':
