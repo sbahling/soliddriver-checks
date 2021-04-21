@@ -153,23 +153,16 @@ class RPMReader:
         mod_reqs = self._get_rpm_symbols(rpm)
 
         tmp = tempfile.TemporaryDirectory()
-        # Path('tmp').mkdir(parents=True, exist_ok=True)
 
         command = 'rpm2cpio %s | cpio -idmv -D %s' % (rpm, tmp.name)
-        rpm_unpack = subprocess.Popen(command,
-                                      shell=True,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-        rpm_unpack.wait()
+        run_cmd(command)
 
         rpm_dir = Path(tmp.name)
         files = tuple(rpm_dir.rglob('*.*'))
-        drivers = [i for i in files if re.search(r'\.(ko|xz\.ko)$', str(i))]
+        drivers = [i for i in files if re.search(r'\.(ko|ko\.xz)$', str(i))]
         result = dict()
 
         if len(drivers) < 1:
-            # os.chdir('../')
-            # shutil.rmtree('tmp')
             tmp.cleanup()
 
             return None
@@ -183,8 +176,6 @@ class RPMReader:
             dpath = dpath[dpath.startswith(tmp.name) + len(tmp.name) - 1:]
             result[dpath] = item
 
-        # os.chdir('../')
-        # shutil.rmtree('tmp')
         tmp.cleanup()
 
         return result
