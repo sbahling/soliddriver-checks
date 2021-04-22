@@ -234,9 +234,10 @@ class RPMReader:
                                            ignore_index=True)
 
     def get_rpms_info(self, path, row_handlers=None, query="all"):
-        rpm_files = run_cmd('find %s -name "*.rpm"' % path)
+        cmd_rpms = 'find %s -regextype sed -regex \'.*-kmp-.*\.rpm$\'' % path
+        rpm_files = run_cmd(cmd_rpms)
         rpm_files = str(rpm_files, 'utf-8').splitlines()
-        rpm_infos = run_cmd('rpm -qpi --nosignature $(find %s -name "*.rpm")' % path)
+        rpm_infos = run_cmd('rpm -qpi --nosignature $(%s)' % cmd_rpms)
 
         if row_handlers is None:
             row_handlers = []
