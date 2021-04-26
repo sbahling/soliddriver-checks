@@ -110,6 +110,9 @@ class RPMsExporter:
         with open(file, 'w') as f:
             f.write(s.render())
 
+    def to_json(self, rpm_table, file):
+        rpm_table.to_json(file, orient='records')
+
     def to_excel(self, rpm_table, file):
         writer = pd.ExcelWriter(file, engine='openpyxl')
         if os.path.exists(file):
@@ -253,6 +256,15 @@ class DriversExporter:
             return 'background-color:%s' % bgcolor_no_rpm
 
         return ''
+
+    def to_json(self, driver_tables, file):
+        jf = dict()
+        for label, driver_table in driver_tables.items():
+            buff = driver_table.to_json(orient='records')
+            jf[label] = json.loads(buff)
+
+        with open(file, "w") as fp:
+            json.dump(jf, fp)
 
     def to_html(self, driver_tables, file):
         html_table_formatter = HTMLTableFormatting()

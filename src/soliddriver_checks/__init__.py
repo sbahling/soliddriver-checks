@@ -19,6 +19,7 @@ QUERY_TYPES = ['suse', 'other', 'unknown', 'all']
 FORMAT_TYPES = {'html': '.html',
                 'excel': '.xlsx',
                 'pdf': '.pdf',
+                'json': '.json',
                 'all': None,
                 }
 
@@ -76,6 +77,8 @@ def export(exporter, check_result, out_format, dst):
         exporter.to_excel(check_result, dst)
     elif out_format == 'pdf':
         exporter.to_pdf(check_result, dst)
+    elif out_format == 'json':
+        exporter.to_json(check_result, dst)
     elif out_format == 'all':
         exporter.to_all(check_result, dst)
 
@@ -107,7 +110,7 @@ def dst_is_ok(dst, out_format):
 @click.command()
 @click.argument('check_target', default='system')
 @click.option('--format', '-f', 'out_format', type=click.Choice(FORMAT_TYPES),
-              default='html',
+              default='json',
               help='Specify output format')
 @click.option('--query', '-q', type=click.Choice(QUERY_TYPES),
               default='all',
