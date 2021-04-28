@@ -9,13 +9,15 @@ from openpyxl import load_workbook
 from openpyxl.formatting.rule import Rule
 import json
 import time
-import importlib_resources
+# import importlib_resources
+import pkgutil
 
 
 class FormatConfig:
     def __init__(self):
-        config = importlib_resources.files('soliddriver_checks') / "config"
-        conf_buffer = (config / "soliddriver-checks.conf").read_text()
+        # config = importlib_resources.files('soliddriver_checks') / "config"
+        # conf_buffer = (config / "soliddriver-checks.conf").read_text()
+        conf_buffer = pkgutil.get_data("soliddriver_checks", "config/soliddriver-checks.conf")
 
         self._formatting = json.loads(conf_buffer)
 
