@@ -262,7 +262,10 @@ class DriversExporter:
     def to_json(self, driver_tables, file):
         jf = dict()
         for label, driver_table in driver_tables.items():
-            buff = driver_table.to_json(orient='records')
+            if driver_table is not None:
+                buff = driver_table.to_json(orient='records')
+            else:
+                buff = '{}'
             jf[label] = json.loads(buff)
 
         with open(file, "w") as fp:

@@ -18,7 +18,7 @@ def check_remote_servers(logger, servers):
                 if server['check'] == 'False':
                     continue
 
-                reader = DriverReader(logger, progress)
+                reader = DriverReader(progress)
                 tinfo = pool.submit(reader.get_remote_drivers,
                                     server['ip'],
                                     server['user'],
