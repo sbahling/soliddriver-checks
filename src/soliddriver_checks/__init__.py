@@ -172,17 +172,19 @@ def run(check_target, output, out_format, query, version):
         out_format = ext_to_format.get(dst.suffix, None)
 
     if target.rpm:
-        rpmCheck = data_reader.RPMReader(logger)
+        rpmCheck = data_reader.RPMReader()
         check_result = rpmCheck.get_rpm_info(target.rpm)
         print(check_result)
 
     elif target.dir:
-        rpmCheck = data_reader.RPMReader(logger)
-        to_terminal = terminal_visualizer.RPMTerminal()
-        with Live(to_terminal.get_table()):
+        progress = Progress("{task.description}",
+                            SpinnerColumn(),
+                            BarColumn(),
+                            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),)
+        with progress:
+            rpmCheck = data_reader.RPMReader(progress)
             check_result = rpmCheck.get_rpms_info(
                 path=target.dir,
-                row_handlers=[to_terminal.add_row],
                 query=query)
         exporter = data_exporter.RPMsExporter(logger)
         export(exporter, check_result, out_format, dst)
@@ -205,7 +207,7 @@ def run(check_target, output, out_format, query, version):
                             BarColumn(),
                             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),)
         with progress:
-            driverCheck = data_reader.DriverReader(logger, progress)
+            driverCheck = data_reader.DriverReader(progress)
             check_result = {label: driverCheck.get_local_drivers(query)}
         exporter = data_exporter.DriversExporter(logger)
         export(exporter, check_result, out_format, dst)

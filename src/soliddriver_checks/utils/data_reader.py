@@ -64,8 +64,8 @@ def run_cmd(cmd, sshClient=None, timeout=None):
 
 
 class RPMReader:
-    def __init__(self, logger):
-        self._logger = logger
+    def __init__(self, progress):
+        self._progress = progress
         self._columns = ['Name',
                          'Path',
                          'Vendor',
@@ -217,6 +217,23 @@ class RPMReader:
                 handler([name, rpm, vendor, signature,
                          distribution, supported, symbols])
 
+            self._progress.console.print('[bright_black]*********************************************************************[/]')
+            self._progress.console.print('name           : %s' % name)
+            self._progress.console.print('path           : %s' % rpm)
+            self._progress.console.print('vendor         : %s' % vendor)
+            self._progress.console.print('signature      : %s' % signature)
+            self._progress.console.print('disturibution  : %s' % distribution)
+            if 'Missing' in supported or 'yes' in supported:
+                self._progress.console.print('[bold red]supported flag : failed \n%s[/]' % supported)
+            else:
+                self._progress.console.print('supported flag : success')
+            if '.ko' in symbols:
+                self._progress.console.print('[bold red]symbols checks : failed \n%s[/]' % symbols)
+            else:
+                self._progress.console.print('symbols checks : success')
+
+            self._progress.advance(self._task)
+
     def _query_filter(self, supported, query):
         if query == 'all':
             return True
@@ -237,6 +254,12 @@ class RPMReader:
         cmd_rpms = 'find %s -regextype sed -regex \'.*-kmp-.*\.rpm$\'' % path
         rpm_files = run_cmd(cmd_rpms)
         rpm_files = str(rpm_files, 'utf-8').splitlines()
+
+        self._task = self._progress.add_task("[italic][bold][green] Checking RPMs "
+                                             + "; Total RPMs: "
+                                             + str(len(rpm_files)),
+                                             total=len(rpm_files))
+
         rpm_infos = run_cmd('rpm -qpi --nosignature $(%s)' % cmd_rpms)
 
         if row_handlers is None:
@@ -258,8 +281,7 @@ class RPMReader:
 
 
 class DriverReader:
-    def __init__(self, logger, progress):
-        self._logger = logger
+    def __init__(self, progress):
         self._progress = progress
         self._columns = ['Name',
                          'Path',
