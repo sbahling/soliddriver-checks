@@ -1,240 +1,547 @@
+from numpy import c_
+from numpy.core.fromnumeric import shape
 import pdfkit
 import pandas as pd
 import os
+from pathlib import Path
 import dominate
-from dominate.tags import html, body, h1, div, tr, td, table
+from dominate.tags import html, body, h1, div, tr, td, th, table, style, ul, li, p
 from dominate.util import raw
-from openpyxl.styles import PatternFill, Font, Alignment
-from openpyxl.styles.borders import Border, Side
+from openpyxl.styles import PatternFill, Font, Border, Side, Alignment, NamedStyle
 from openpyxl.styles.differential import DifferentialStyle
 from openpyxl import load_workbook
 from openpyxl.formatting.rule import Rule
+from openpyxl.utils.dataframe import dataframe_to_rows
 import json
 import ast
 import string
 from openpyxl import Workbook
 import time
-# import importlib_resources
-# import pkgutil
 
 
-class FormatConfig:
+class StyleConfig:
     def __init__(self):
         pkg_path = os.path.dirname(__file__)
         cfg_path = f"{pkg_path}/../config/soliddriver-checks.conf"
 
-        with open(cfg_path, 'r') as fp:
-            self._formatting = json.load(fp)
+        with open(cfg_path, "r") as fp:
+            self._conf = json.load(fp)
 
-    def load_body_format(self):
-        return self._formatting["body"]
+    def _get_xlsx_info(self, *locs):
+        conf = self._conf
+        for loc in locs:
+            conf = conf[loc]
 
-    def load_table_format(self):
-        return self._formatting["table"]
+        font = Font(
+            name=conf["font"]["family"],
+            size=conf["font"]["size"],
+            bold=conf["font"]["bold"],
+        )
+        sd = Side(
+            border_style=conf["side"]["border_style"], color=conf["side"]["color"]
+        )
+        bd = Border(top=sd, left=sd, right=sd, bottom=sd)
+        fill = PatternFill(start_color=conf["fill"]["bgcolor"],
+                           end_color=conf["fill"]["bgcolor"],
+                           fill_type="solid")
 
-    def load_rpm_info_format(self):
-        return self._formatting['highlight']['rpm-info']
+        return font, bd, fill
 
-    def load_support_flag_format(self):
-        return self._formatting['highlight']['support-flag']
+    def get_rpm_html_css(self):
+        return self._conf["rpm-check"]["html"]
 
-    def load_running_format(self):
-        return self._formatting['highlight']['running']
-    
-    def load_symbol_format(self):
-        return self._formatting['highlight']['symbol']
+    def get_rpm_xslx_table_header(self):
+        return self._get_xlsx_info("rpm-check", "excel", "table", "header")
 
+    def get_rpm_xslx_table_normal(self):
+        return self._get_xlsx_info("rpm-check", "excel", "table", "data", "normal")
 
-class HTMLTableFormatting:
-    def __init__(self):
-        self._formatting = FormatConfig()
+    def get_rpm_xslx_table_warning(self):
+        return self._get_xlsx_info("rpm-check", "excel", "table", "data", "warning")
 
-    def get_style(self):
-        table_formatting = self._formatting.load_table_format()
-        styles = [
-            dict(selector='table',
-                 props=[('border', table_formatting['border'])]),
-            dict(selector='th',
-                 props=[('border', table_formatting['th']['border']),
-                        ('font-size', table_formatting['th']['font-size']),
-                        ('font-family', table_formatting['th']['font-family']),
-                        ('background-color',
-                        table_formatting['th']['background-color'])]),
-            dict(selector='td',
-                 props=[('border', table_formatting['th']['border']),
-                        ('font-size', table_formatting['td']['font-size']),
-                        ('font-family',
-                        table_formatting['td']['font-family'])])
-            ]
+    def get_rpm_xslx_table_great_row(self):
+        return self._get_xlsx_info("rpm-check", "excel", "table", "row", "great")
 
-        return styles
+    def get_rpm_xslx_table_warn_row(self):
+        return self._get_xlsx_info("rpm-check", "excel", "table", "row", "warn")
 
+    def get_driver_html_css(self):
+        return self._conf["driver-check"]["html"]["style"]
+
+    def get_driver_html_warning_data(self):
+        return self._conf["driver-check"]["html"]["data"]["warn"]["bgcolor"]
+
+    def get_driver_html_warning_row(self):
+        return self._conf["driver-check"]["html"]["row"]["warn"]["border"]
+
+    def get_driver_xslx_table_header(self):
+        return self._get_xlsx_info("driver-check", "excel", "table", "header")
+
+    def get_driver_xslx_table_normal(self):
+        return self._get_xlsx_info("driver-check", "excel", "table", "data", "normal")
+
+    def get_driver_xslx_table_warning(self):
+        return self._get_xlsx_info("driver-check", "excel", "table", "data", "warning")
+
+    def get_driver_xslx_table_warn_row(self):
+        return self._get_xlsx_info("driver-check", "excel", "table", "row", "warn")
 
 class RPMsExporter:
     def __init__(self, logger):
         self._logger = logger
-        self._formatting = FormatConfig()
+        self._style = StyleConfig()
 
-    def _supported_render(self, value):
-        formatting = self._formatting.load_support_flag_format()
-        bgcolor_missing = formatting['Missing']['background-color']
-        bgcolor_yes = formatting['yes']['background-color']
-        # bgcolor_external = formatting['external']['background-color']
-        if ': no' in value or ': Missing' in value:
-            return 'background-color: ' + bgcolor_missing
-        elif ': yes' in value:
-            return 'background-color: ' + bgcolor_yes
-        # elif ': external' in value:
-        #     return 'background-color: ' + bgcolor_external
-        else:
-            return 'background-color: white'
+    def _summary_symbol_result(self, val):
+        unfound_no = len(val["unfound"])
+        cs_mm_no = len(val["checksum-mismatch"])
+        if unfound_no == 0 and cs_mm_no == 0:
+            return ""
 
-    def _symbol_render(self, value):
-        if value == '':
-            return ''
+        result = ""
+        if unfound_no > 0:
+            result = "Can not find symbols like {} ... in RPM! ".format(
+                val["unfound"][0]
+            )
 
-        formatting = self._formatting.load_symbol_format()
-        bgcolor = formatting['mismatch']['background-color']
-        return 'background-color: %s' % bgcolor
+        if cs_mm_no > 0:
+            result = (
+                result
+                + "Symbols check sum like {} ... does not match in RPM!".format(
+                    val["checksum-mismatch"][0]
+                )
+            )
 
+        return result
 
-    def _highlight_supported_error(self, row):
-        return ['background-color: #CD5C5C; color: white' if row[1] != 'external' else '' for r in row]
-
-    def _fmt_supported_to_html(self, val):
-        if val == '':
-            return ''
-        else:
-            val = ast.literal_eval(val)
-            df = pd.DataFrame.from_dict(val, orient='index')
-            s = df.style.apply(self._highlight_supported_error, axis=1).\
-                hide_index()
-            return s.render(head=[])
-
-    def _fmt_driver_symbol_result(self, val):
-        unfound = ""
-        for i in range(len(val['unfound'])):
-            if i % 5 == 0:
-                unfound += "\n"
-            unfound += val['unfound'][i] + ", "
-
-        mismatch = ""
-        for i in range(len(val['checksum-mismatch'])):
-            if i % 5 == 0:
-                mismatch += "\n"
-            mismatch += val['checksum-mismatch'][i] + ", "
-
-        return "Can't find symbols in RPM: \n" + unfound + "\n\n" + "symbols check sum doesn't match in RPM: \n" + mismatch
-
-    def _fmt_symbol_check_to_html(self, val):
-        if val == '':
-            return '{}'
-
-        val = ast.literal_eval(val)
+    def _get_sym_check_failed(self, val):
+        result = ""
         for key in val:
-            val[key]['symbol check'] = self._fmt_driver_symbol_result(val[key]['symbol check'])
-            val[key]['symbol check'] = val[key]['symbol check'].replace('\n', '</br>')
+            summary = self._summary_symbol_result(val[key]["symbol check"])
+            if summary != "":
+                result = result + "Found {} has below issue(s):\n  {}\n".format(
+                    Path(val[key]["drivers"]).name, summary
+                )
 
-        df = pd.DataFrame.from_dict(val, orient='index')
-        return df.style.hide_index().\
-                  set_table_styles([dict(selector='table', props=[('border','1px solid red')]),
-                                    dict(selector='th', props=[('border','1px solid red')]),
-                                    dict(selector='td', props=[('border','1px solid red'),
-                                                               ('background-color','#CD5C5C'),
-                                                               ('color','white')])]).render(head=[])
+        return result
 
-    def _error_in_supported(self, val):
-        if val == '':
-            return False
-        else:
-            val = ast.literal_eval(val)
-            for key in val:
-                if val[key]['assessment'] == 'Missing' or val[key]['assessment'] == 'yes':
-                    return True
+    def _get_supported_driver_failed(self, supported):
+        failed_drivers = []
+        for key in supported:
+            if supported[key]["assessment"] != "external":
+                d_name = Path(supported[key]["drivers"]).name
+                failed_drivers.append(f"{d_name} : {supported[key]['assessment']}")
 
-        return False
+        return failed_drivers
+
+    def _get_summary_table(self, rpm_table):
+        df = rpm_table.copy()
+        df = df.rename(
+            columns={
+                "Driver Flag: supported": "supported",
+                "Symbols Check": "symbols_check",
+            }
+        )
+        df["supported"] = df["supported"].astype(str)
+        df["symbols_check"] = df["symbols_check"].astype(str)
+        df.loc[df["supported"].str.contains("Missing"), "supported"] = "Missing"
+        df.loc[df["supported"].str.contains("yes"), "supported"] = "yes"
+        df.loc[df["supported"].str.contains("external"), "supported"] = "external"
+        df.loc[df["supported"] == "", "supported"] = "no drivers"
+
+        df.loc[df["symbols_check"].str.contains("ko"), "symbols_check"] = "failed"
+        df.loc[df["symbols_check"] == "{}", "symbols_check"] = "pass"
+
+        vendors = df["Vendor"].unique()
+        df_summary = pd.DataFrame(
+            columns=[
+                "vendor",
+                "total rpms",
+                "supported:yes",
+                "supported:external",
+                "no supported flag",
+                "symbols check failed",
+                "symbols check pass",
+            ]
+        )
+        for v in vendors:
+            df_vendor = df.loc[df["Vendor"] == v]
+            total = len(df_vendor.index)
+            missing = len(
+                df_vendor.loc[
+                    df_vendor["supported"].str.contains("Missing"), "supported"
+                ].index
+            )
+            yes = len(
+                df_vendor.loc[
+                    df_vendor["supported"].str.contains("yes"), "supported"
+                ].index
+            )
+            external = len(
+                df_vendor.loc[
+                    ~df_vendor["supported"].str.contains("yes")
+                    & ~df_vendor["supported"].str.contains("Missing"),
+                    "supported",
+                ].index
+            )
+            failed = len(
+                df_vendor.loc[
+                    df_vendor["symbols_check"] == "failed", "symbols_check"
+                ].index
+            )
+            pass_ = total - failed
+            df_summary = df_summary.append(
+                {
+                    "vendor": v,
+                    "total rpms": total,
+                    "supported:yes": f"{yes} ({yes/total * 100:.2f})",
+                    "supported:external": f"{external} ({external/total * 100:.2f}%)",
+                    "no supported flag": f"{missing} ({missing/total * 100:.2f}%)",
+                    "symbols check failed": f"{failed} ({failed/total * 100:.2f}%)",
+                    "symbols check pass": f"{pass_} ({pass_/total * 100:.2f}%)",
+                },
+                ignore_index=True,
+            )
+
+        return df_summary
 
     def to_html(self, rpm_table, file):
-        tableFormatter = HTMLTableFormatting()
-        styles = tableFormatter.get_style()
+        report = dominate.document(title="checking result from soliddriver-checks")
 
-        rpm_table['Driver Flag: supported'] = rpm_table['Driver Flag: supported'].astype(str)
-        rpm_table['Symbols Check'] = rpm_table['Symbols Check'].astype(str)
-        report = dominate.document(title='checking result from soliddriver-checks')
-
-        table_style = f"border:1px solid green;font-size:12px;font-family:sans-serif"
-        row_style = f"{table_style}"
-        row_warning_style = f"{table_style};border-color: red"
-        cell_style = row_style
-        cell_warning_style= f"{table_style};border-color: red"
-        cell_warn_red_style = f"border:1px solid red;font-size:12px;font-family:sans-serif"
-        header_style = f"{table_style}"
         with report:
-            with table(style=table_style):
+            with report.head:
+                style(self._style.get_rpm_html_css())
+            with div():
+                title = h1("Solid driver check result (RPMs)")
+                title.set_attribute(
+                    "style",
+                    "text-align: center; font-size:x-large;background-color: #30BA78;",
+                )
+            context = p(
+                "soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements."
+            )
+            context.set_attribute("style", "font-size:small;")
+            context = p(
+                raw(
+                    'Please refer to <a href="https://drivers.suse.com/doc/kmpm/" style="background-color: #30BA78;">Kernel Module Packages Manual</a> to learn how to build a KMP(Kernel Module Package).'
+                )
+            )
+            context.set_attribute("style", "font-size:x-small")
+            context = p("What do we check?")
+            with ul() as u:
+                u.set_attribute("style", "font-size:x-small")
+                li(
+                    "supported flag: 'yes' means this package is built by SUSE and supported by SUSE, 'external' means this package is built by vendor and supported by both SUSE and vendor, 'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag, please contact your IHV or who provide this package to you, we don't recommend you install it. "
+                )
+                li(
+                    "symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it."
+                )
+                li(
+                    "signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself."
+                )
+                li(
+                    "vendor: SUSE partner who provides and supports the kernel module code and packaging."
+                )
+
+            with div():
+                summary_title = p("Summary of the result from vendor perspective: ")
+                summary_title.set_attribute(
+                    "style",
+                    "text-align: center; font-size:large;background-color: #30BA78;",
+                )
+
+            with table() as tb:
+                tb.set_attribute("class", "summary_table")
+                df_summary = self._get_summary_table(rpm_table)
+                with tr():
+                    cols = df_summary.columns
+                    for col in cols:
+                        if col == "vendor":
+                            t = th(col)
+                            t.set_attribute("class", "summary_vendor")
+                        else:
+                            th(col)
+
+                    for i, row in df_summary.iterrows():
+                        vendor = row["vendor"]
+                        total_rpms = row["total rpms"]
+                        s_yes = row["supported:yes"]
+                        s_external = row["supported:external"]
+                        s_missing = row["no supported flag"]
+                        sym_pass = row["symbols check pass"]
+                        sym_failed = row["symbols check failed"]
+
+                        row_passed = False
+                        if (
+                            int(s_external.split(" ")[0]) == total_rpms
+                            and int(sym_pass.split(" ")[0]) == total_rpms
+                        ):
+                            row_passed = True
+                        with tr() as r:
+                            if row_passed:
+                                r.set_attribute("class", "summary_row_great")
+                            if vendor != "":
+                                td(vendor)
+                            else:
+                                tv = td("no vendor information")
+                                tv.set_attribute("class", "item_check_failed")
+                            with td(total_rpms) as t:
+                                t.set_attribute("class", "summary_total")
+                            with td(s_yes) as t:
+                                if int(s_yes.split(" ")[0]) != 0:
+                                    t.set_attribute(
+                                        "class", "item_check_failed summary_number"
+                                    )
+                                else:
+                                    t.set_attribute("class", "summary_number")
+                            with td(s_external) as t:
+                                t.set_attribute("class", "summary_number")
+                            with td(s_missing) as t:
+                                if int(s_missing.split(" ")[0]) != 0:
+                                    t.set_attribute(
+                                        "class", "item_check_failed summary_number"
+                                    )
+                                else:
+                                    t.set_attribute("class", "summary_number")
+                            with td(sym_failed) as t:
+                                if int(sym_failed.split(" ")[0]) != 0:
+                                    t.set_attribute(
+                                        "class", "item_check_failed summary_number"
+                                    )
+                                else:
+                                    t.set_attribute("class", "summary_number")
+                            with td(sym_pass) as t:
+                                t.set_attribute("class", "summary_number")
+
+            with div():
+                detail_table = p("Check result in details: ")
+                detail_table.set_attribute(
+                    "style",
+                    "text-align: center; font-size:large;background-color: #30BA78;",
+                )
+
+            with table() as tb:
+                tb.set_attribute("class", "table_center")
                 with tr():
                     cols = rpm_table.columns
                     for col in cols:
-                        td(col, style=header_style)
+                        if col == "Path":
+                            tp = th(col)
+                            tp.set_attribute("class", "detail_path")
+                        else:
+                            th(col)
 
                 for i, row in rpm_table.iterrows():
-                    supported = row['Driver Flag: supported']
-                    symbol_check = row['Symbols Check']
-                    curr_row_style = row_style
-                    if self._error_in_supported(supported) or symbol_check != '':
-                        curr_row_style = row_warning_style
-                    with tr(style=curr_row_style):
-                        for c in cols:
-                            val = row[c]
-                            if c == 'Driver Flag: supported':
-                                if self._error_in_supported(val):
-                                    td(raw(self._fmt_supported_to_html(val)), style=cell_warning_style)
-                                else:
-                                    td(raw(self._fmt_supported_to_html(val)), style=cell_style)
-                            elif c == 'Symbols Check':
-                                if val != '{}':
-                                    td(raw(self._fmt_symbol_check_to_html(val)), style=cell_warn_red_style)
-                                else:
-                                    td("", style=cell_style)
+                    supported = row["Driver Flag: supported"]
+                    d_err = self._get_supported_driver_failed(supported)
+                    no_err = len(d_err)
+                    with tr() as r:
+                        if no_err > 0:
+                            r.set_attribute("class", "warning_row_border")
+                        name = row["Name"]
+                        path = row["Path"]
+                        vendor = row["Vendor"]
+                        signature = row["Signature"]
+                        distribution = row["Distribution"]
+                        sym_check = self._get_sym_check_failed(
+                            row["Symbols Check"]
+                        ).replace("\n", "</br>")
+                        if no_err > 1:
+                            td(name, rowspan=no_err)
+                            td(path, rowspan=no_err)
+                            if vendor != "":
+                                td(vendor, rowspan=no_err)
                             else:
-                                td(val, style=cell_style)
+                                tv = td("no vendor information", rowspan=no_err)
+                                tv.set_attribute("class", "detail_no_vendor")
+                                r.set_attribute("class", "warning_row_border")
+                            td(signature, rowspan=no_err)
+                            td(distribution, rowspan=no_err)
+                            t_w = td(d_err[0])
+                            t_w.set_attribute("class", "supported_failed")
+                            if sym_check == "":
+                                t = td("All passed!", rowspan=no_err)
+                                t.set_attribute("class", "detail_pass")
+                            else:
+                                t_w = td(raw(sym_check), rowspan=no_err)
+                                t_w.set_attribute("class", "sym_check_failed")
+                                r.set_attribute("class", "warning_row_border")
+                            for val in d_err[1:]:
+                                with tr() as r:
+                                    r.set_attribute("class", "warning_row_border")
+                                    t_w = td(val)
+                                    t_w.set_attribute("class", "supported_failed")
+                        else:
+                            td(name)
+                            td(path)
+                            if vendor != "":
+                                td(vendor)
+                            else:
+                                tv = td("no vendor information")
+                                tv.set_attribute("class", "detail_no_vendor")
+                                r.set_attribute("class", "warning_row_border")
+                            td(signature)
+                            td(distribution)
+                            if no_err > 0:
+                                t_w = td(d_err[0])
+                                t_w.set_attribute("class", "supported_failed")
+                            else:
+                                t = td("All passed!")
+                                t.set_attribute("class", "detail_pass")
+                            if sym_check == "":
+                                t = td("All passed!")
+                                t.set_attribute("class", "detail_pass")
+                            else:
+                                t_w = td(raw(sym_check))
+                                t_w.set_attribute("class", "sym_check_failed")
+                                r.set_attribute("class", "warning_row_border")
 
-        with open(file, 'w') as f:
+        with open(file, "w") as f:
             f.write(report.render())
 
-        return
-
     def to_json(self, rpm_table, file):
-        rpm_table.to_json(file, orient='records')
+        rpm_table.to_json(file, orient="records")
 
-    def to_excel(self, rpm_table, file):
-        if os.path.exists(file):
-            os.remove(file)
+    def _xlsx_create_overview(self, wb):
+        ws_ov = wb.active
+        ws_ov.title = "overview"
 
-        rpm_table['Driver Flag: supported'] = rpm_table['Driver Flag: supported'].astype(str)
-        rpm_table['Symbols Check'] = rpm_table['Symbols Check'].astype(str)
+        c_name = "A1"
+        ft_name = "Poppins Medium"
+        ws_ov[c_name] = "Solid driver check result(RPMs)"
+        ws_ov[c_name].alignment = Alignment(
+            horizontal="center", vertical="center", wrap_text=False
+        )
+        ws_ov[c_name].fill = PatternFill(start_color="30BA78", end_color="30BA78", fill_type="solid")
+        ws_ov[c_name].font = Font(name=ft_name, size=18, bold=True)
+        ws_ov.merge_cells("A1:J1")
+
+        c_name = "A3"
+        ws_ov[
+            c_name
+        ] = "soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements."
+        ws_ov[c_name].font = Font(name=ft_name, size=11)
+        ws_ov[c_name].alignment = Alignment(wrap_text=True)
+        ws_ov.merge_cells("A3:J3")
+
+        c_name = "A5"
+        ws_ov[
+            c_name
+        ] = "Please refer to Kernel Module Packages Manual to learn how to build a KMP(Kernel Module Package)."
+        ws_ov[c_name].font = Font(name=ft_name, size=8)
+        ws_ov[c_name].alignment = Alignment(wrap_text=True)
+        ws_ov.merge_cells("A5:J5")
+
+        c_name = "A7"
+        ws_ov[c_name] = "What do we check?"
+        ws_ov[c_name].font = Font(name=ft_name, size=14)
+        ws_ov.merge_cells("A7:J7")
+
+        sd = Side(border_style="thin", color="30BA78")
+        bd = Border(top=sd, left=sd, right=sd, bottom=sd)
+        c_name = "A8"
+        ws_ov[
+            c_name
+        ] = "supported flag: 'yes' means this package is built by SUSE and supported by SUSE, 'external' means this package is built by vendor and supported by both SUSE and vendor, 'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag, please contact your IHV or who provide this package to you, we don't recommend you install it."
+        ws_ov[c_name].font = Font(name=ft_name, size=8)
+        ws_ov[c_name].alignment = Alignment(wrap_text=True)
+        ws_ov[c_name].border = bd
+        ws_ov.merge_cells("A8:J8")
+
+        c_name = "A9"
+        ws_ov[
+            c_name
+        ] = "symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it."
+        ws_ov[c_name].font = Font(name=ft_name, size=8)
+        ws_ov[c_name].alignment = Alignment(wrap_text=True)
+        ws_ov[c_name].border = bd
+        ws_ov.merge_cells("A9:J9")
+
+        c_name = "A10"
+        ws_ov[
+            c_name
+        ] = "signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself."
+        ws_ov[c_name].font = Font(name=ft_name, size=8)
+        ws_ov[c_name].alignment = Alignment(wrap_text=True)
+        ws_ov[c_name].border = bd
+        ws_ov.merge_cells("A10:J10")
+
+        c_name = "A11"
+        ws_ov[
+            c_name
+        ] = "vendor: SUSE partner who provides and supports the kernel module code and packaging."
+        ws_ov[c_name].font = Font(name=ft_name, size=8)
+        ws_ov[c_name].alignment = Alignment(wrap_text=True)
+        ws_ov[c_name].border = bd
+        ws_ov.merge_cells("A11:J11")
+
+    def _xlsx_create_vendor_summary(self, wb, rpm_table):
+        ws_vs = wb.create_sheet("vendor summary")
+        sm_table = self._get_summary_table(rpm_table)
+        for row in dataframe_to_rows(sm_table, index=False, header=True):
+            ws_vs.append(row)
+
+        header_font, header_border, header_fill = self._style.get_rpm_xslx_table_header()
+        for cell in ws_vs[1]:
+            cell.font = header_font
+            cell.border = header_border
+            cell.fill = header_fill
+
+        for row in ws_vs[f"A1:G{len(sm_table.index)+1}"]:
+            for cell in row:
+                cell.border = header_border
+
+        last_record_row_no = len(sm_table.index) + 1
+        great_font, great_border, great_fill = self._style.get_rpm_xslx_table_great_row()
+        great_row_style = DifferentialStyle(
+            font=great_font,
+            border=great_border,
+            fill=great_fill,
+        )
+        great_row = Rule(type="expression", dxf=great_row_style)
+        great_row.formula = [
+            'AND(VALUE(LEFT($D2, FIND(" ",$D2)-1)) = $B2, VALUE(LEFT($G2, FIND(" ", $G2)-1)) = $B2)'
+        ]
+        ws_vs.conditional_formatting.add(f"A2:G{last_record_row_no}", great_row)
+
+        warn_font, warn_border, warn_fill = self._style.get_rpm_xslx_table_warning()
+        sd = Side(border_style="thin", color="FE7C3F")
+        warning_style = DifferentialStyle(
+            font=warn_font,
+            border=warn_border,
+            fill=warn_fill,
+        )
+        empty_vendor = Rule(type="expression", dxf=warning_style)
+        empty_vendor.formula = ['$A2 = ""']
+        ws_vs.conditional_formatting.add(f"A2:A{last_record_row_no}", empty_vendor)
+
+        supported_yes = Rule(type="expression", dxf=warning_style)
+        supported_yes.formula = ['VALUE(LEFT($C2, FIND(" ", $C2) - 1)) <> 0']
+        ws_vs.conditional_formatting.add(f"C2:C{last_record_row_no}", supported_yes)
+
+        supported_missing = Rule(type="expression", dxf=warning_style)
+        supported_missing.formula = ['VALUE(LEFT($E2, FIND(" ", $E2) - 1)) <> 0']
+        ws_vs.conditional_formatting.add(f"E2:E{last_record_row_no}", supported_missing)
+
+        sym_failed = Rule(type="expression", dxf=warning_style)
+        sym_failed.formula = ['VALUE(LEFT($F2, FIND(" ", $F2) - 1)) <> 0']
+        ws_vs.conditional_formatting.add(f"F2:F{last_record_row_no}", sym_failed)
+
+    def _xlsx_create_rpm_details(self, wb, rpm_table):
+        ws_rd = wb.create_sheet("RPMs details")
+        normal_font, normal_border, normal_fill = self._style.get_rpm_xslx_table_normal()
+        normal_align = Alignment(horizontal="left", vertical="top", wrap_text=True)
+        center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        warn_font, warn_border, warn_fill = self._style.get_rpm_xslx_table_warning()
+        header_font, header_border, header_fill = self._style.get_rpm_xslx_table_header()
 
         cols = rpm_table.columns
         xlsx_cols = list(string.ascii_lowercase[0:len(cols)])
-
-        wb = Workbook()
-        ws = wb.active
-        ws.title = 'solid driver checks'
-
-        general_border = Border(left=Side(border_style="thin",
-                                          color='00339966'),
-                                right=Side(border_style="thin",
-                                          color='00339966'),
-                                top=Side(border_style="thin",
-                                         color='00339966'),
-                                bottom=Side(border_style="thin",
-                                            color='00339966'))
-        general_align = Alignment(horizontal='left',vertical='top',wrap_text=True)
-
         for i in range(len(xlsx_cols)):
-            cell_no = xlsx_cols[i] + '1'
-            ws[cell_no] = cols[i]
-            ws[cell_no].border = general_border
-            ws[cell_no].alignment = general_align
+            cell_no = xlsx_cols[i] + "1"
+            ws_rd[cell_no] = cols[i]
+            ws_rd[cell_no].font = header_font
+            ws_rd[cell_no].fill = header_fill
+            ws_rd[cell_no].border = header_border
 
         curr_row_no = 2
         supported_col_no = 0
@@ -248,91 +555,97 @@ class RPMsExporter:
             for col_idx in range(len(cols)):
                 cell_no = xlsx_cols[col_idx] + str(curr_row_no)
                 val = row[cols[col_idx]]
+
+                ws_rd[cell_no].font = normal_font
+                ws_rd[cell_no].fill = normal_fill
+                ws_rd[cell_no].border = normal_border
+                ws_rd[cell_no].alignment = normal_align
+
                 if cols[col_idx] == "Symbols Check":
-                    if val == "{}":
-                        val == ""
-                    else:
-                        val = ast.literal_eval(val)
-                        fmt_sc = ""
-                        for item in val:
-                            fmt_sc = fmt_sc + val[item]['drivers'] + '\n'
-                            fmt_sc = fmt_sc + self._fmt_driver_symbol_result(val[item]['symbol check'])
-                        val = fmt_sc
-                ws[cell_no] = val
-                ws[cell_no].border = general_border
-                ws[cell_no].alignment = general_align
+                    val = self._get_sym_check_failed(val)
+                    if val == "":
+                        val = "All passed!"
+                        ws_rd[cell_no].alignment = center_align
+                elif cols[col_idx] == "Driver Flag: supported":
+                    val = "All passed!"
+                    ws_rd[cell_no].alignment = center_align
+                ws_rd[cell_no] = val
 
-            supported = row['Driver Flag: supported']
-            supported = ast.literal_eval(supported)
-            df = pd.DataFrame.from_dict(supported, orient='index')
-            driver_count = df.shape[0]
-            if driver_count > 0: # format supported information
-                for sp_idx, d in df.iterrows():
+            failed_drivers = self._get_supported_driver_failed(
+                row["Driver Flag: supported"]
+            )
+            driver_count = len(failed_drivers)
+            if driver_count > 0:  # format supported information
+                for sp_idx in range(driver_count):
                     cell_no = xlsx_cols[supported_col_no] + str(curr_row_no + sp_idx)
-                    ws[cell_no] = d[0] + ' : ' + d[1]
-                    ws[cell_no].border = general_border
-                    ws[cell_no].alignment = general_align
+                    ws_rd[cell_no] = failed_drivers[sp_idx]
+                    ws_rd[cell_no].font = warn_font
+                    ws_rd[cell_no].fill = warn_fill
+                    ws_rd[cell_no].border = warn_border
+                    ws_rd[cell_no].alignment = normal_align
 
-            if driver_count > 1: # need merge cell
+            if driver_count > 1:  # need merge cell
                 for col_idx in range(len(cols)):
                     if col_idx != supported_col_no:
                         start_cell_no = xlsx_cols[col_idx] + str(curr_row_no)
-                        end_cell_no = xlsx_cols[col_idx] + str(curr_row_no+driver_count - 1)
+                        end_cell_no = xlsx_cols[col_idx] + str(
+                            curr_row_no + driver_count - 1
+                        )
                         merge_range = start_cell_no + ":" + end_cell_no
-                        ws.merge_cells(merge_range)
+                        ws_rd.merge_cells(merge_range)
 
             if driver_count == 0:
                 curr_row_no += 1
             else:
                 curr_row_no += driver_count
 
-        records = len(rpm_table.index) + 1
-        support_area = 'F2:F' + str(records)
-        support_flag_format = self._formatting.load_support_flag_format()
-        na_text = Font(color=support_flag_format['Missing']['font-color'])
-        na_fill = PatternFill(bgColor=support_flag_format['Missing']['background-color'])
-        na = DifferentialStyle(font=na_text, fill=na_fill)
-        yes_text = Font(color=support_flag_format['yes']['font-color'])
-        yes_fill = PatternFill(bgColor=support_flag_format['yes']['background-color'])
-        yes = DifferentialStyle(font=yes_text, fill=yes_fill)
+        records = curr_row_no
+        support_area = "F2:F" + str(records)
+        ds_warn = DifferentialStyle(font=warn_font, border=warn_border, fill=warn_fill)
 
-        support_flag_na_rule = Rule(type='containsText',
-                                    operator='containsText',
-                                    text='Missing', dxf=na)
-        support_flag_yes_rule = Rule(type='containsText',
-                                     operator='containsText',
-                                     text='yes', dxf=yes)
+        support_flag_na_rule = Rule(
+            type="containsText", operator="containsText", text="Missing", dxf=ds_warn
+        )
+        support_flag_yes_rule = Rule(
+            type="containsText", operator="containsText", text="yes", dxf=ds_warn
+        )
 
-        ws.conditional_formatting.add(support_area,
-                                             support_flag_na_rule)
-        ws.conditional_formatting.add(support_area,
-                                             support_flag_yes_rule)
+        ws_rd.conditional_formatting.add(support_area, support_flag_na_rule)
+        ws_rd.conditional_formatting.add(support_area, support_flag_yes_rule)
 
-        sym_area = 'G2:G' + str(records)
-        sym_format = self._formatting.load_symbol_format()
-        mismatch_text = Font(color=sym_format['mismatch']['font-color'])
-        mismatch_fill = PatternFill(bgColor=sym_format['mismatch']['background-color'])
-        mismatch = DifferentialStyle(font=mismatch_text, fill=mismatch_fill)
+        sym_area = "G2:G" + str(records)
+        mismatch_rule = Rule(
+            type="containsText", operator="containsText", text=".ko", dxf=ds_warn
+        )
 
-        mismatch_rule = Rule(type='containsText',
-                             operator='containsText',
-                             text='.ko', dxf=mismatch)
+        ws_rd.conditional_formatting.add(sym_area, mismatch_rule)
 
-        ws.conditional_formatting.add(sym_area, mismatch_rule)
+    def _xlsx_create_report_workbook(self):
+        wb = Workbook()
 
-        
+        return wb
+
+    def to_excel(self, rpm_table, file):
+        if os.path.exists(file):
+            os.remove(file)
+
+        wb = self._xlsx_create_report_workbook()
+
+        self._xlsx_create_overview(wb)
+        self._xlsx_create_vendor_summary(wb, rpm_table)
+        self._xlsx_create_rpm_details(wb, rpm_table)
 
         wb.save(file)
 
     def to_pdf(self, rpm_table, file):
-        self.to_html(rpm_table, '.tmp.rpms.html')
-        pdfkit.from_file('.tmp.rpms.html', file)
-        os.remove('.tmp.rpms.html')
+        self.to_html(rpm_table, ".tmp.rpms.html")
+        pdfkit.from_file(".tmp.rpms.html", file)
+        os.remove(".tmp.rpms.html")
 
     def to_all(self, rpm_table, directory):
-        excel_file = os.path.join(directory, 'check_result.xlsx')
-        html_file = os.path.join(directory, 'check_result.html')
-        pdf_file = os.path.join(directory, 'check_result.pdf')
+        excel_file = os.path.join(directory, "check_result.xlsx")
+        html_file = os.path.join(directory, "check_result.html")
+        pdf_file = os.path.join(directory, "check_result.pdf")
 
         if not os.path.exists(directory):
             os.mkdir(directory)
@@ -352,106 +665,96 @@ class RPMsExporter:
 class DriversExporter:
     def __init__(self, logger):
         self._logger = logger
-        self._formatting = FormatConfig()
+        self._style = StyleConfig()
 
-    def _supported_color(self, value):
-        if value == 'yes':
-            return '[green]' + value + '[/green]'
-        elif value == 'external':
-            return value
-            # return '[blue]' + value + '[/blue]'
+    def _fmt_rpm_info(self, val):
+        color = self._style.get_driver_html_warning_data()
+        if "is not owned by any package" in val:
+            return "background-color:%s;" % color
         else:
-            return '[red]' + value + '[/red]'
+            return ""
 
-    def _running_color(self, value):
-        if value == 'True':
-            return '[green]True[/green]'
+    def _fmt_supported_flag(self, val):
+        color = self._style.get_driver_html_warning_data()
+        if val != "external":
+            return "background-color:%s;" % color
         else:
-            return '[gray]False[gray]'
+            return ""
 
-    def _rpm_info_color(self, value):
-        if 'is not owned by any package' in value:
-            return '[red]' + value + '[/red]'
-        else:
-            return value
-
-    def _supported_html_format_handler(self, value):
-        value = value.lstrip().rstrip()
-        supported = self._formatting.load_support_flag_format()
-        bgcolor_yes = supported['yes']['background-color']
-        # bgcolor_external = supported['external']['background-color']
-        bgcolor_missing = supported['Missing']['background-color']
-        if value == 'yes':
-            return 'background-color:%s' % bgcolor_yes
-        # elif value == 'external':
-        #     return 'background-color:%s' % bgcolor_external
-        elif value == 'Missing' or value == 'no':
-            return 'background-color:%s' % bgcolor_missing
-
-        return ''
-
-    def _running_html_format_handler(self, value):
-        running_format = self._formatting.load_running_format()
-        bgcolor_true = running_format['true']['background-color']
-        bgcolor_false = running_format['false']['background-color']
-        if value == 'True':
-            return 'background-color:%s' % bgcolor_true
-
-        return 'background-color:%s' % bgcolor_false
-
-    def _rpm_info_html_format_handler(self, value):
-        rpm_format = self._formatting.load_rpm_info_format()
-        bgcolor_no_rpm = rpm_format['no-rpm']['background-color']
-        if 'is not owned by any package' in value:
-            return 'background-color:%s' % bgcolor_no_rpm
-
-        return ''
+    def _fmt_warning_row_border(self, row):
+        border = self._style.get_driver_html_warning_row()
+        return [f"border:{border}" if row["Flag: supported"] != "external" or "is not owned by any package" in row["RPM Information"] else "" for r in row]
 
     def to_json(self, driver_tables, file):
         jf = dict()
         for label, driver_table in driver_tables.items():
             if driver_table is not None:
-                buff = driver_table.to_json(orient='records')
+                buff = driver_table.to_json(orient="records")
             else:
-                buff = '{}'
+                buff = "{}"
             jf[label] = json.loads(buff)
 
         with open(file, "w") as fp:
             json.dump(jf, fp)
 
     def to_html(self, driver_tables, file):
-        html_table_formatter = HTMLTableFormatting()
-        styles = html_table_formatter.get_style()
-        body_format = self._formatting.load_body_format()
-        context = html()
-        with context:
-            font_family = body_format["font-family"]
-            body_style = 'font-family: %s;' % font_family
-            with body(style=body_style):
-                for label, driver_table in driver_tables.items():
-                    s = driver_table.style.\
-                        applymap(self._supported_html_format_handler,
-                                 subset=pd.IndexSlice[:, ['Flag: supported']]).\
-                        applymap(self._running_html_format_handler,
-                                 subset=pd.IndexSlice[:, ['Running']]).\
-                        applymap(self._rpm_info_html_format_handler,
-                                 subset=pd.IndexSlice[:, ['RPM Information']]).hide_index().\
-                        set_table_styles(styles)
+        report = dominate.document(title="checking result from soliddriver-checks")
 
-                    h1('Solid Driver Checking Result: %s' % label)
-                    div(raw(s.render()))
+        with report:
+            with report.head:
+                style(self._style.get_driver_html_css())
+            with body():
+                for label, dt in driver_tables.items():
+                    df = dt.copy()
+                    df.loc[df["Running"] == "True", "Running"] = "&#9989;"
+                    df.loc[df["Running"] == "False", "Running"] = "&#9940;"
+                    ts = df.style.hide_index()\
+                           .set_table_attributes('class="table_center"')\
+                           .applymap(self._fmt_rpm_info, subset=pd.IndexSlice[:, ["RPM Information"]])\
+                           .applymap(self._fmt_supported_flag, subset=pd.IndexSlice[:, ["Flag: supported"]])\
+                           .apply(self._fmt_warning_row_border, axis=1)
 
-        with open(file, 'w') as f:
-            f.write(context.render())
+                    with div():
+                        detail_table = p('Solid Driver Checking Result: %s' % label)
+                        detail_table.set_attribute(
+                                        "style",
+                                        "text-align: center; font-size:large;background-color: #30BA78;",
+                                        )
+
+                    raw(ts.render())
+
+        with open(file, "w") as f:
+            f.write(report.render())
+
+    def _xlsx_create_overview(self, wb):
+        pass
 
     def to_excel(self, driver_tables, file):
-        for server in driver_tables:
-            writer = pd.ExcelWriter(file, engine='openpyxl')
-            if os.path.exists(file):
-                writer = pd.ExcelWriter(file, engine='openpyxl', mode='a')
+        writer = pd.ExcelWriter(file, engine="openpyxl")
+        if os.path.exists(file):
+                writer = pd.ExcelWriter(file, engine="openpyxl", mode="a")
 
-            driver_tables[server].to_excel(writer, index=False,
-                                           sheet_name=server)
+        for label, dt in driver_tables.items():
+            df = dt.copy()
+            ts = df.style.hide_index()\
+                           .set_table_attributes('class="table_center"')\
+                           .applymap(self._fmt_rpm_info, subset=pd.IndexSlice[:, ["RPM Information"]])\
+                           .applymap(self._fmt_supported_flag, subset=pd.IndexSlice[:, ["Flag: supported"]])\
+                           .apply(self._fmt_warning_row_border, axis=1)
+
+            ts.to_excel(writer, index=False, sheet_name=label)
+
+        writer.save()
+        writer.close()
+        
+        return
+
+        for server in driver_tables:
+            writer = pd.ExcelWriter(file, engine="openpyxl")
+            if os.path.exists(file):
+                writer = pd.ExcelWriter(file, engine="openpyxl", mode="a")
+
+            driver_tables[server].to_excel(writer, index=False, sheet_name=server)
             writer.save()
             writer.close()
 
@@ -466,73 +769,87 @@ class DriversExporter:
 
             records = str(len(driver_tables[server].index))
 
-            support_flag_area = 'C2:C' + records
-            running_area = 'E2:E' + records
-            rpm_info_area = 'F2:F' + records
+            support_flag_area = "C2:C" + records
+            running_area = "E2:E" + records
+            rpm_info_area = "F2:F" + records
 
             support_flag_format = self._formatting.load_support_flag_format()
-            na_text = Font(color=support_flag_format['Missing']['font-color'])
-            na_fill = PatternFill(bgColor=support_flag_format['Missing']['background-color'])
+            na_text = Font(color=support_flag_format["Missing"]["font-color"])
+            na_fill = PatternFill(
+                bgColor=support_flag_format["Missing"]["background-color"]
+            )
             na = DifferentialStyle(font=na_text, fill=na_fill)
-            yes_text = Font(color=support_flag_format['yes']['font-color'])
-            yes_fill = PatternFill(bgColor=support_flag_format['yes']['background-color'])
+            yes_text = Font(color=support_flag_format["yes"]["font-color"])
+            yes_fill = PatternFill(
+                bgColor=support_flag_format["yes"]["background-color"]
+            )
             yes = DifferentialStyle(font=yes_text, fill=yes_fill)
-            # external_text = Font(color=support_flag_format['external']['font-color'])
-            # external_fill = PatternFill(bgColor=support_flag_format['external']['background-color'])
-            # external = DifferentialStyle(font=external_text, fill=external_fill)
             running_format = self._formatting.load_running_format()
-            false_text = Font(color=running_format['false']['font-color'])
-            false_fill = PatternFill(bgColor=running_format['false']['background-color'])
+            false_text = Font(color=running_format["false"]["font-color"])
+            false_fill = PatternFill(
+                bgColor=running_format["false"]["background-color"]
+            )
             false_format = DifferentialStyle(font=false_text, fill=false_fill)
-            true_text = Font(color=running_format['true']['font-color'])
-            true_fill = PatternFill(bgColor=running_format['true']['background-color'])
+            true_text = Font(color=running_format["true"]["font-color"])
+            true_fill = PatternFill(bgColor=running_format["true"]["background-color"])
             true_format = DifferentialStyle(font=true_text, fill=true_fill)
             rpm_info_format = self._formatting.load_rpm_info_format()
-            no_rpm_text = Font(color=rpm_info_format['no-rpm']['font-color'])
-            no_rpm_fill = PatternFill(bgColor=rpm_info_format['no-rpm']['background-color'])
+            no_rpm_text = Font(color=rpm_info_format["no-rpm"]["font-color"])
+            no_rpm_fill = PatternFill(
+                bgColor=rpm_info_format["no-rpm"]["background-color"]
+            )
             no_rpm = DifferentialStyle(font=no_rpm_text, fill=no_rpm_fill)
-            support_flag_na_rule = Rule(type='containsText',
-                                        operator='containsText',
-                                        text='Missing', dxf=na)
+            support_flag_na_rule = Rule(
+                type="containsText", operator="containsText", text="Missing", dxf=na
+            )
             # support_flag_external_rule = Rule(type='containsText',
             #                                   operator='containsText',
             #                                   text='external', dxf=external)
-            support_flag_yes_rule = Rule(type='containsText',
-                                         operator='containsText',
-                                         text='yes', dxf=yes)
-            running_yes_rule = Rule(type='containsText',
-                                    operator='containsText',
-                                    text='True', dxf=true_format)
-            running_no_rule = Rule(type='containsText',
-                                   operator='containsText',
-                                   text='False', dxf=false_format)
-            no_rpm_rule = Rule(type='containsText', operator='containsText',
-                               text='is not owned by any package', dxf=no_rpm)
+            support_flag_yes_rule = Rule(
+                type="containsText", operator="containsText", text="yes", dxf=yes
+            )
+            running_yes_rule = Rule(
+                type="containsText",
+                operator="containsText",
+                text="True",
+                dxf=true_format,
+            )
+            running_no_rule = Rule(
+                type="containsText",
+                operator="containsText",
+                text="False",
+                dxf=false_format,
+            )
+            no_rpm_rule = Rule(
+                type="containsText",
+                operator="containsText",
+                text="is not owned by any package",
+                dxf=no_rpm,
+            )
 
-            worksheet.conditional_formatting.add(support_flag_area,
-                                                 support_flag_na_rule)
+            worksheet.conditional_formatting.add(
+                support_flag_area, support_flag_na_rule
+            )
             # worksheet.conditional_formatting.add(support_flag_area,
             #                                      support_flag_external_rule)
-            worksheet.conditional_formatting.add(support_flag_area,
-                                                 support_flag_yes_rule)
-            worksheet.conditional_formatting.add(running_area,
-                                                 running_yes_rule)
-            worksheet.conditional_formatting.add(running_area,
-                                                 running_no_rule)
-            worksheet.conditional_formatting.add(rpm_info_area,
-                                                 no_rpm_rule)
+            worksheet.conditional_formatting.add(
+                support_flag_area, support_flag_yes_rule
+            )
+            worksheet.conditional_formatting.add(running_area, running_yes_rule)
+            worksheet.conditional_formatting.add(running_area, running_no_rule)
+            worksheet.conditional_formatting.add(rpm_info_area, no_rpm_rule)
 
             workbook.save(file)
 
     def to_pdf(self, driver_tables, file):
-        self.to_html(driver_tables, '.tmp.rpms.html')
-        pdfkit.from_file('.tmp.rpms.html', file)
-        os.remove('.tmp.rpms.html')
+        self.to_html(driver_tables, ".tmp.rpms.html")
+        pdfkit.from_file(".tmp.rpms.html", file)
+        os.remove(".tmp.rpms.html")
 
     def to_all(self, driver_tables, directory):
-        excel_file = os.path.join(directory, 'check_result.xlsx')
-        html_file = os.path.join(directory, 'check_result.html')
-        pdf_file = os.path.join(directory, 'check_result.pdf')
+        excel_file = os.path.join(directory, "check_result.xlsx")
+        html_file = os.path.join(directory, "check_result.html")
+        pdf_file = os.path.join(directory, "check_result.pdf")
 
         if not os.path.exists(directory):
             os.mkdir(directory)
