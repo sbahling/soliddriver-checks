@@ -504,7 +504,6 @@ class RPMsExporter:
         ws_vs.conditional_formatting.add(f"A2:G{last_record_row_no}", great_row)
 
         warn_font, warn_border, warn_fill = self._style.get_rpm_xslx_table_warning()
-        sd = Side(border_style="thin", color="FE7C3F")
         warning_style = DifferentialStyle(
             font=warn_font,
             border=warn_border,
@@ -620,6 +619,19 @@ class RPMsExporter:
 
         ws_rd.conditional_formatting.add(sym_area, mismatch_rule)
 
+        empty_vendor =Rule(type="expression", dxf=ds_warn)
+        empty_vendor.formula = ['$C2 = ""']
+        ws_rd.conditional_formatting.add(f"C2:C{records}", empty_vendor)
+
+        warn_row_style = DifferentialStyle(
+            border=warn_border
+        )
+        warn_row = Rule(type="expression", dxf=warn_row_style)
+        warn_row.formula = [
+            'OR($F2 <> "All passed!", $G2 <> "All passed!", $C2 = "")'
+        ]
+        ws_rd.conditional_formatting.add(f"A2:G{records}", warn_row)
+
     def _xlsx_create_report_workbook(self):
         wb = Workbook()
 
@@ -646,6 +658,7 @@ class RPMsExporter:
         excel_file = os.path.join(directory, "check_result.xlsx")
         html_file = os.path.join(directory, "check_result.html")
         pdf_file = os.path.join(directory, "check_result.pdf")
+        json_file = os.path.join(directory, "check_result.json")
 
         if not os.path.exists(directory):
             os.mkdir(directory)
@@ -656,10 +669,13 @@ class RPMsExporter:
                 os.remove(html_file)
             if os.path.exists(pdf_file):
                 os.remove(pdf_file)
+            if os.path.exists(json_file):
+                os.remove(json_file)
 
         self.to_excel(rpm_table, excel_file)
         self.to_html(rpm_table, html_file)
         self.to_pdf(rpm_table, pdf_file)
+        self.to_json(rpm_table, json_file)
 
 
 class DriversExporter:
@@ -676,14 +692,14 @@ class DriversExporter:
 
     def _fmt_supported_flag(self, val):
         color = self._style.get_driver_html_warning_data()
-        if val != "external":
+        if val != "external" and val != "yes":
             return "background-color:%s;" % color
         else:
             return ""
 
     def _fmt_warning_row_border(self, row):
         border = self._style.get_driver_html_warning_row()
-        return [f"border:{border}" if row["Flag: supported"] != "external" or "is not owned by any package" in row["RPM Information"] else "" for r in row]
+        return [f"border:{border}" if (row["Flag: supported"] != "external" and row["Flag: supported"] != "yes") or "is not owned by any package" in row["RPM Information"] else "" for r in row]
 
     def to_json(self, driver_tables, file):
         jf = dict()
@@ -729,120 +745,69 @@ class DriversExporter:
     def _xlsx_create_overview(self, wb):
         pass
 
+    def _xlsx_create_table(self, wb, label, driver_table):
+        ws_dc = wb.create_sheet(label)
+        for row in dataframe_to_rows(driver_table, index=False, header=True):
+            ws_dc.append(row)
+
+        header_font, header_border, header_fill = self._style.get_driver_xslx_table_header()
+        for cell in ws_dc[1]:
+            cell.font = header_font
+            cell.border = header_border
+            cell.fill = header_fill
+
+        for row in ws_dc[f"A1:F{len(driver_table.index)+1}"]:
+            for cell in row:
+                cell.border = header_border
+
+        last_record_row_no = len(driver_table.index) + 1
+
+        warn_font, warn_border, warn_fill = self._style.get_driver_xslx_table_warning()
+        warning_style = DifferentialStyle(
+            font=warn_font,
+            border=warn_border,
+            fill=warn_fill,
+        )
+        sup_failed = Rule(type="expression", dxf=warning_style)
+        sup_failed.formula = ['AND($C2 <> "external", $C2 <> "yes")']
+        ws_dc.conditional_formatting.add(f"C2:C{last_record_row_no}", sup_failed)
+
+        rpm_failed = Rule(type="expression", dxf=warning_style)
+        rpm_failed.formula = ['ISNUMBER(SEARCH("is not owned by any package", $F2))']
+        ws_dc.conditional_formatting.add(f"F2:F{last_record_row_no}", rpm_failed)
+
+        warn_row_style = DifferentialStyle(
+            border=warn_border
+        )
+        warn_row = Rule(type="expression", dxf=warn_row_style)
+        warn_row.formula = [
+            'OR(AND($C2 <> "external", $C2 <> "yes"), ISNUMBER(SEARCH("is not owned by any package", $F2)))'
+        ]
+        ws_dc.conditional_formatting.add(f"A2:F{last_record_row_no}", warn_row)
+
     def to_excel(self, driver_tables, file):
-        writer = pd.ExcelWriter(file, engine="openpyxl")
-        if os.path.exists(file):
-                writer = pd.ExcelWriter(file, engine="openpyxl", mode="a")
+        wb = Workbook()
+        self._xlsx_create_overview(wb)
 
         for label, dt in driver_tables.items():
-            df = dt.copy()
-            ts = df.style.hide_index()\
-                           .set_table_attributes('class="table_center"')\
-                           .applymap(self._fmt_rpm_info, subset=pd.IndexSlice[:, ["RPM Information"]])\
-                           .applymap(self._fmt_supported_flag, subset=pd.IndexSlice[:, ["Flag: supported"]])\
-                           .apply(self._fmt_warning_row_border, axis=1)
+            self._xlsx_create_table(wb, label, dt)
 
-            ts.to_excel(writer, index=False, sheet_name=label)
+        if os.path.exists(file):
+            os.remove(file)
 
-        writer.save()
-        writer.close()
-        
-        return
-
-        for server in driver_tables:
-            writer = pd.ExcelWriter(file, engine="openpyxl")
-            if os.path.exists(file):
-                writer = pd.ExcelWriter(file, engine="openpyxl", mode="a")
-
-            driver_tables[server].to_excel(writer, index=False, sheet_name=server)
-            writer.save()
-            writer.close()
-
-            workbook = load_workbook(filename=file)
-            worksheet = workbook[server]
-
-            records = len(driver_tables[server].index)
-
-            if records < 1:
-                workbook.save(file)
-                continue
-
-            records = str(len(driver_tables[server].index))
-
-            support_flag_area = "C2:C" + records
-            running_area = "E2:E" + records
-            rpm_info_area = "F2:F" + records
-
-            support_flag_format = self._formatting.load_support_flag_format()
-            na_text = Font(color=support_flag_format["Missing"]["font-color"])
-            na_fill = PatternFill(
-                bgColor=support_flag_format["Missing"]["background-color"]
-            )
-            na = DifferentialStyle(font=na_text, fill=na_fill)
-            yes_text = Font(color=support_flag_format["yes"]["font-color"])
-            yes_fill = PatternFill(
-                bgColor=support_flag_format["yes"]["background-color"]
-            )
-            yes = DifferentialStyle(font=yes_text, fill=yes_fill)
-            running_format = self._formatting.load_running_format()
-            false_text = Font(color=running_format["false"]["font-color"])
-            false_fill = PatternFill(
-                bgColor=running_format["false"]["background-color"]
-            )
-            false_format = DifferentialStyle(font=false_text, fill=false_fill)
-            true_text = Font(color=running_format["true"]["font-color"])
-            true_fill = PatternFill(bgColor=running_format["true"]["background-color"])
-            true_format = DifferentialStyle(font=true_text, fill=true_fill)
-            rpm_info_format = self._formatting.load_rpm_info_format()
-            no_rpm_text = Font(color=rpm_info_format["no-rpm"]["font-color"])
-            no_rpm_fill = PatternFill(
-                bgColor=rpm_info_format["no-rpm"]["background-color"]
-            )
-            no_rpm = DifferentialStyle(font=no_rpm_text, fill=no_rpm_fill)
-            support_flag_na_rule = Rule(
-                type="containsText", operator="containsText", text="Missing", dxf=na
-            )
-            # support_flag_external_rule = Rule(type='containsText',
-            #                                   operator='containsText',
-            #                                   text='external', dxf=external)
-            support_flag_yes_rule = Rule(
-                type="containsText", operator="containsText", text="yes", dxf=yes
-            )
-            running_yes_rule = Rule(
-                type="containsText",
-                operator="containsText",
-                text="True",
-                dxf=true_format,
-            )
-            running_no_rule = Rule(
-                type="containsText",
-                operator="containsText",
-                text="False",
-                dxf=false_format,
-            )
-            no_rpm_rule = Rule(
-                type="containsText",
-                operator="containsText",
-                text="is not owned by any package",
-                dxf=no_rpm,
-            )
-
-            worksheet.conditional_formatting.add(
-                support_flag_area, support_flag_na_rule
-            )
-            # worksheet.conditional_formatting.add(support_flag_area,
-            #                                      support_flag_external_rule)
-            worksheet.conditional_formatting.add(
-                support_flag_area, support_flag_yes_rule
-            )
-            worksheet.conditional_formatting.add(running_area, running_yes_rule)
-            worksheet.conditional_formatting.add(running_area, running_no_rule)
-            worksheet.conditional_formatting.add(rpm_info_area, no_rpm_rule)
-
-            workbook.save(file)
+        wb.save(file)
 
     def to_pdf(self, driver_tables, file):
         self.to_html(driver_tables, ".tmp.rpms.html")
+
+        content = ""
+        with open(".tmp.rpms.html", "r") as fp:
+            content = fp.read()
+
+        content = str(content).replace("&#9989;", "True").replace("&#9940;", "False")
+        with open(".tmp.rpms.html", "w") as fp:
+            fp.write(content)
+
         pdfkit.from_file(".tmp.rpms.html", file)
         os.remove(".tmp.rpms.html")
 
@@ -850,6 +815,7 @@ class DriversExporter:
         excel_file = os.path.join(directory, "check_result.xlsx")
         html_file = os.path.join(directory, "check_result.html")
         pdf_file = os.path.join(directory, "check_result.pdf")
+        json_file = os.path.join(directory, "check_result.json")
 
         if not os.path.exists(directory):
             os.mkdir(directory)
@@ -860,7 +826,10 @@ class DriversExporter:
                 os.remove(html_file)
             if os.path.exists(pdf_file):
                 os.remove(pdf_file)
+            if os.path.exists(json_file):
+                os.remove(json_file)
 
         self.to_excel(driver_tables, excel_file)
         self.to_html(driver_tables, html_file)
         self.to_pdf(driver_tables, pdf_file)
+        self.to_pdf(driver_tables, json_file)
