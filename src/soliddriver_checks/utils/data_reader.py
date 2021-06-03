@@ -124,30 +124,33 @@ class RPMReader:
             if len(values) < 2:
                 continue
 
-            if values[0].rstrip() == 'supported':
-                return ":".join(values[1:]).lstrip()
+            if values[0].strip() == 'supported':
+                return ":".join(values[1:]).strip()
 
         return "Missing"
 
-    def _drivers_terminal_format(self, drivers):
-        supported = ""
-        symbols = ""
-        for driver in drivers:
-            supported += "%s : %s\n" % (driver, drivers[driver]['supported'])
-            syms = drivers[driver]['symbols']
+    def _fmt_driver_supported(self, drivers):
+        supported = dict()
+        for d in drivers:
+            supported[d] = drivers[d]['supported']
 
-            if len(syms['unfound']) == 0 and len(syms['checksum-mismatch']) == 0:
+        df = pd.DataFrame(supported.items(), columns=['drivers', 'assessment'])
+
+        return df.to_dict(orient='index')
+
+    def _fmt_driver_symbol(self, drivers):
+        symbols = dict()
+        for d in drivers:
+            d_info = dict()
+            d_info['unfound'] = drivers[d]['symbols']['unfound']
+            d_info['checksum-mismatch'] = drivers[d]['symbols']['checksum-mismatch']
+            if len(d_info['unfound']) == 0 and len(d_info['checksum-mismatch']) == 0:
                 continue
             else:
-                symbols += "********************\nSymbols error founded in driver: %s\n" % driver
+                symbols[d] = d_info
 
-            if len(syms['unfound']) > 0:
-                symbols += "Symbols not found in rpm requires:\n %s\n" % syms['unfound']
-
-            if len(syms['checksum-mismatch']) > 0:
-                symbols += "Symbol checksum does not match:\n %s\n" % syms['checksum-mismatch']
-
-        return supported, symbols
+        df = pd.DataFrame(symbols.items(), columns=['drivers', 'symbol check'])
+        return df.to_dict(orient='index')
 
     def _driver_checks(self, rpm: str):
         mod_reqs = self._get_rpm_symbols(rpm)
@@ -187,7 +190,7 @@ class RPMReader:
 
         for i, rpm in enumerate(rpm_files):
             info = rpms[i].splitlines()
-            name = info[0].lstrip()
+            name = info[0].strip()
             signature = ''
             distribution = ''
             vendor = ''
@@ -196,11 +199,11 @@ class RPMReader:
                 if len(values) < 2:
                     continue
 
-                if values[0].rstrip() == "Signature":
+                if values[0].strip() == "Signature":
                     signature = ":".join(values[1:])
-                elif values[0].rstrip() == "Distribution":
+                elif values[0].strip() == "Distribution":
                     distribution = ":".join(values[1:])
-                elif values[0].rstrip() == "Vendor":
+                elif values[0].strip() == "Vendor":
                     vendor = ":".join(values[1:])
 
             driver_checks = self._driver_checks(rpm)
@@ -208,7 +211,8 @@ class RPMReader:
             supported = ""
             symbols = ""
             if driver_checks is not None:
-                supported, symbols = self._drivers_terminal_format(driver_checks)
+                supported = self._fmt_driver_supported(driver_checks)
+                symbols = self._fmt_driver_symbol(driver_checks)
 
             if not self._query_filter(supported, query):
                 continue
@@ -360,7 +364,7 @@ class DriverReader:
         files = []
         for driver in running_driver_info:
             driver = driver.splitlines()
-            files.append(driver[0].lstrip().rstrip())
+            files.append(driver[0].strip())
 
         return files
     
@@ -422,7 +426,7 @@ class DriverReader:
         rpm_table = []
         for driver in drivers_modinfo:
             driver = driver.splitlines()
-            filename = driver[0].lstrip().rstrip()
+            filename = driver[0].strip()
             name = ''
             supported = 'Missing'
             suserelease = 'Missing'
@@ -436,11 +440,11 @@ class DriverReader:
                     continue
 
                 if values[0] == "supported":
-                    supported = ":".join(values[1:]).lstrip()
+                    supported = ":".join(values[1:]).strip()
                 elif values[0] == "suserelease":
-                    suserelease = ":".join(values[1:]).lstrip()
+                    suserelease = ":".join(values[1:]).strip()
                 elif values[0] == "name":
-                    name = ":".join(values[1:]).lstrip()
+                    name = ":".join(values[1:]).strip()
 
             if name == '':
                 name = Path(filename).name

@@ -1,4 +1,4 @@
 """
 Global version information used in soliddriver-checks and the package
 """
-__VERSION__ = '0.0.25'
+__VERSION__ = '1.0.0'
