@@ -134,9 +134,7 @@ class RPMReader:
         for d in drivers:
             supported[d] = drivers[d]['supported']
 
-        df = pd.DataFrame(supported.items(), columns=['drivers', 'assessment'])
-
-        return df.to_dict(orient='index')
+        return supported
 
     def _fmt_driver_symbol(self, drivers):
         symbols = dict()
@@ -149,8 +147,7 @@ class RPMReader:
             else:
                 symbols[d] = d_info
 
-        df = pd.DataFrame(symbols.items(), columns=['drivers', 'symbol check'])
-        return df.to_dict(orient='index')
+        return symbols
 
     def _driver_checks(self, rpm: str):
         mod_reqs = self._get_rpm_symbols(rpm)
