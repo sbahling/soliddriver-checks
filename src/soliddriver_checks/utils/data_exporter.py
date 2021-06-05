@@ -115,21 +115,21 @@ class RPMsExporter:
 
     def _get_sym_check_failed(self, val):
         result = ""
-        for key in val:
-            summary = self._summary_symbol_result(val[key]["symbol check"])
+        for driver in val:
+            summary = self._summary_symbol_result(val[driver])
             if summary != "":
                 result = result + "Found {} has below issue(s):\n  {}\n".format(
-                    Path(val[key]["drivers"]).name, summary
+                    Path(driver).name, summary
                 )
 
         return result
 
     def _get_supported_driver_failed(self, supported):
         failed_drivers = []
-        for key in supported:
-            if supported[key]["assessment"] != "external":
-                d_name = Path(supported[key]["drivers"]).name
-                failed_drivers.append(f"{d_name} : {supported[key]['assessment']}")
+        for driver in supported:
+            if supported[driver] != "external":
+                d_name = Path(driver).name
+                failed_drivers.append(f"{d_name} : {supported[driver]}")
 
         return failed_drivers
 
