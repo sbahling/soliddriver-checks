@@ -210,37 +210,23 @@ class RPMsExporter:
         with report:
             with report.head:
                 style(self._style.get_rpm_html_css())
-            with div():
-                title = h1("Solid driver check result (RPMs)")
-                title.set_attribute(
-                    "style",
-                    "text-align: center; font-size:x-large;background-color: #30BA78;",
-                )
-            context = p(
-                "soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements."
-            )
-            context.set_attribute("style", "font-size:small;")
-            context = p(
-                raw(
-                    'Please refer to <a href="https://drivers.suse.com/doc/kmpm/" style="background-color: #30BA78;">Kernel Module Packages Manual</a> to learn how to build a KMP(Kernel Module Package).'
-                )
-            )
-            context.set_attribute("style", "font-size:x-small")
-            context = p("What do we check?")
-            with ul() as u:
-                u.set_attribute("style", "font-size:x-small")
-                li(
-                    "supported flag: 'yes' means this package is built by SUSE and supported by SUSE, 'external' means this package is built by vendor and supported by both SUSE and vendor, 'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag, please contact your IHV or who provide this package to you, we don't recommend you install it. "
-                )
-                li(
-                    "symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it."
-                )
-                li(
-                    "signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself."
-                )
-                li(
-                    "vendor: SUSE partner who provides and supports the kernel module code and packaging."
-                )
+            div(raw("""<div>
+      <h1 style="text-align: center; font-size:x-large;background-color: #30BA78;">Solid driver check result (RPMs)</h1>
+    </div>
+    <p style="font-size:small;">soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements.</p>
+    <p style="font-size:x-small">Please refer to <a href="https://drivers.suse.com/doc/kmpm/" style="background-color: #30BA78;">Kernel Module Packages Manual</a> to learn how to build a KMP(Kernel Module Package).</p>
+    <p>What do we check?</p>
+    <ul style="font-size:x-small">
+      <li>supported flag: <ul>
+        <li>'yes' means this package is built by SUSE and supported by SUSE</li>
+        <li>'external' means this package is built by vendor and supported by both SUSE and vendor</li>
+        <li>'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag</li>
+      </ul>Please contact your IHV or who provide this package to you if it's highlighted, we don't recommend you install it. </li>
+      <li>symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it.</li>
+      <li>signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself.</li>
+      <li>vendor: SUSE partner who provides and supports the kernel module code and packaging.</li>
+    </ul>
+    <div>"""))
 
             with div():
                 summary_title = p("Summary of the result from vendor perspective: ")
@@ -720,6 +706,23 @@ class DriversExporter:
             with report.head:
                 style(self._style.get_driver_html_css())
             with body():
+                div(raw("""<div>
+            <h1 style="text-align: center; font-size:x-large;background-color: #30BA78;">Solid driver check result (Drivers)</h1>
+        </dev>
+        <p style="font-size:large;">soliddriver-checks is a tool for parnter(s) and customer(s) to check their drivers installed and RPMs to ensure these are meet basic SUSE requirements.</p>
+    <p>What do we check for drivers?</p>
+    <ul style="font-size:x-small">
+      <li>supported flag: 
+      <ul>
+          <li>'yes' means this package is built by SUSE and supported by SUSE</li>
+          <li>'external' means this package is built by vendor and supported by both SUSE and vendor</li>
+          <li>'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag</li>
+          Please contact your IHV or who provide this package to you if it's highlighted, we don't recommend you install it.
+      </ul>
+      </li>
+      <li>RPM information: means which RPM have this driver installed</li>
+      <li>SUSE Release: this driver was built for which SUSE OS version</li>
+    </ul>"""))
                 for label, dt in driver_tables.items():
                     df = dt.copy()
                     df.loc[df["Running"] == "True", "Running"] = "&#9989;"
