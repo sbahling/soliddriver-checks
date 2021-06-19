@@ -17,6 +17,7 @@ import ast
 import string
 from openpyxl import Workbook
 import time
+from jinja2 import Environment, FileSystemLoader
 
 
 class StyleConfig:
@@ -41,9 +42,11 @@ class StyleConfig:
             border_style=conf["side"]["border_style"], color=conf["side"]["color"]
         )
         bd = Border(top=sd, left=sd, right=sd, bottom=sd)
-        fill = PatternFill(start_color=conf["fill"]["bgcolor"],
-                           end_color=conf["fill"]["bgcolor"],
-                           fill_type="solid")
+        fill = PatternFill(
+            start_color=conf["fill"]["bgcolor"],
+            end_color=conf["fill"]["bgcolor"],
+            fill_type="solid",
+        )
 
         return font, bd, fill
 
@@ -85,6 +88,7 @@ class StyleConfig:
 
     def get_driver_xslx_table_warn_row(self):
         return self._get_xlsx_info("driver-check", "excel", "table", "row", "warn")
+
 
 class RPMsExporter:
     def __init__(self, logger):
@@ -146,6 +150,7 @@ class RPMsExporter:
         df.loc[df["supported"].str.contains("Missing"), "supported"] = "Missing"
         df.loc[df["supported"].str.contains("yes"), "supported"] = "yes"
         df.loc[df["supported"].str.contains("external"), "supported"] = "external"
+        df.loc[df["supported"].str.contains("Multiple"), "supported"] = "Multiple"
         df.loc[df["supported"] == "", "supported"] = "no drivers"
 
         df.loc[df["symbols_check"].str.contains("ko"), "symbols_check"] = "failed"
@@ -159,6 +164,7 @@ class RPMsExporter:
                 "supported:yes",
                 "supported:external",
                 "no supported flag",
+                "multiple supported flags",
                 "symbols check failed",
                 "symbols check pass",
             ]
@@ -183,6 +189,11 @@ class RPMsExporter:
                     "supported",
                 ].index
             )
+            multiple = len(
+                df_vendor.loc[
+                    df_vendor["supported"].str.contains("Multiple"), "supported",
+                ].index
+            )
             failed = len(
                 df_vendor.loc[
                     df_vendor["symbols_check"] == "failed", "symbols_check"
@@ -196,6 +207,7 @@ class RPMsExporter:
                     "supported:yes": f"{yes} ({yes/total * 100:.2f})",
                     "supported:external": f"{external} ({external/total * 100:.2f}%)",
                     "no supported flag": f"{missing} ({missing/total * 100:.2f}%)",
+                    "multiple supported flags": f"{multiple} ({multiple/total * 100:.2f}%)",
                     "symbols check failed": f"{failed} ({failed/total * 100:.2f}%)",
                     "symbols check pass": f"{pass_} ({pass_/total * 100:.2f}%)",
                 },
@@ -204,185 +216,182 @@ class RPMsExporter:
 
         return df_summary
 
-    def to_html(self, rpm_table, file):
-        report = dominate.document(title="checking result from soliddriver-checks")
+    def _get_summary_table_html(self, rpm_table):
+        tb = table()
+        with tb:
+            tb.set_attribute("class", "summary_table")
+            df_summary = self._get_summary_table(rpm_table)
+            with tr():
+                cols = df_summary.columns
+                for col in cols:
+                    if col == "vendor":
+                        t = th(col)
+                        t.set_attribute("class", "summary_vendor")
+                    else:
+                        th(col)
 
-        with report:
-            with report.head:
-                style(self._style.get_rpm_html_css())
-            div(raw("""<div>
-      <h1 style="text-align: center; font-size:x-large;background-color: #30BA78;">Solid driver check result (RPMs)</h1>
-    </div>
-    <p style="font-size:small;">soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements.</p>
-    <p style="font-size:x-small">Please refer to <a href="https://drivers.suse.com/doc/kmpm/" style="background-color: #30BA78;">Kernel Module Packages Manual</a> to learn how to build a KMP(Kernel Module Package).</p>
-    <p>What do we check?</p>
-    <ul style="font-size:x-small">
-      <li>supported flag: <ul>
-        <li>'yes' means this package is built by SUSE and supported by SUSE</li>
-        <li>'external' means this package is built by vendor and supported by both SUSE and vendor</li>
-        <li>'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag</li>
-      </ul>Please contact your IHV or who provide this package to you if it's highlighted, we don't recommend you install it. </li>
-      <li>symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it.</li>
-      <li>signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself.</li>
-      <li>vendor: SUSE partner who provides and supports the kernel module code and packaging.</li>
-    </ul>
-    <div>"""))
+                for i, row in df_summary.iterrows():
+                    vendor = row["vendor"]
+                    total_rpms = row["total rpms"]
+                    s_yes = row["supported:yes"]
+                    s_external = row["supported:external"]
+                    s_missing = row["no supported flag"]
+                    s_multiple = row["multiple supported flags"]
+                    sym_pass = row["symbols check pass"]
+                    sym_failed = row["symbols check failed"]
 
-            with div():
-                summary_title = p("Summary of the result from vendor perspective: ")
-                summary_title.set_attribute(
-                    "style",
-                    "text-align: center; font-size:large;background-color: #30BA78;",
-                )
-
-            with table() as tb:
-                tb.set_attribute("class", "summary_table")
-                df_summary = self._get_summary_table(rpm_table)
-                with tr():
-                    cols = df_summary.columns
-                    for col in cols:
-                        if col == "vendor":
-                            t = th(col)
-                            t.set_attribute("class", "summary_vendor")
-                        else:
-                            th(col)
-
-                    for i, row in df_summary.iterrows():
-                        vendor = row["vendor"]
-                        total_rpms = row["total rpms"]
-                        s_yes = row["supported:yes"]
-                        s_external = row["supported:external"]
-                        s_missing = row["no supported flag"]
-                        sym_pass = row["symbols check pass"]
-                        sym_failed = row["symbols check failed"]
-
-                        row_passed = False
-                        if (
-                            int(s_external.split(" ")[0]) == total_rpms
-                            and int(sym_pass.split(" ")[0]) == total_rpms
-                        ):
-                            row_passed = True
-                        with tr() as r:
-                            if row_passed:
-                                r.set_attribute("class", "summary_row_great")
-                            if vendor != "":
-                                td(vendor)
-                            else:
-                                tv = td("no vendor information")
-                                tv.set_attribute("class", "item_check_failed")
-                            with td(total_rpms) as t:
-                                t.set_attribute("class", "summary_total")
-                            with td(s_yes) as t:
-                                if int(s_yes.split(" ")[0]) != 0:
-                                    t.set_attribute(
-                                        "class", "item_check_failed summary_number"
-                                    )
-                                else:
-                                    t.set_attribute("class", "summary_number")
-                            with td(s_external) as t:
-                                t.set_attribute("class", "summary_number")
-                            with td(s_missing) as t:
-                                if int(s_missing.split(" ")[0]) != 0:
-                                    t.set_attribute(
-                                        "class", "item_check_failed summary_number"
-                                    )
-                                else:
-                                    t.set_attribute("class", "summary_number")
-                            with td(sym_failed) as t:
-                                if int(sym_failed.split(" ")[0]) != 0:
-                                    t.set_attribute(
-                                        "class", "item_check_failed summary_number"
-                                    )
-                                else:
-                                    t.set_attribute("class", "summary_number")
-                            with td(sym_pass) as t:
-                                t.set_attribute("class", "summary_number")
-
-            with div():
-                detail_table = p("Check result in details: ")
-                detail_table.set_attribute(
-                    "style",
-                    "text-align: center; font-size:large;background-color: #30BA78;",
-                )
-
-            with table() as tb:
-                tb.set_attribute("class", "table_center")
-                with tr():
-                    cols = rpm_table.columns
-                    for col in cols:
-                        if col == "Path":
-                            tp = th(col)
-                            tp.set_attribute("class", "detail_path")
-                        else:
-                            th(col)
-
-                for i, row in rpm_table.iterrows():
-                    supported = row["Driver Flag: supported"]
-                    d_err = self._get_supported_driver_failed(supported)
-                    no_err = len(d_err)
+                    row_passed = False
+                    if (
+                        int(s_external.split(" ")[0]) == total_rpms
+                        and int(sym_pass.split(" ")[0]) == total_rpms
+                    ):
+                        row_passed = True
                     with tr() as r:
-                        if no_err > 0:
-                            r.set_attribute("class", "warning_row_border")
-                        name = row["Name"]
-                        path = row["Path"]
-                        vendor = row["Vendor"]
-                        signature = row["Signature"]
-                        distribution = row["Distribution"]
-                        sym_check = self._get_sym_check_failed(
-                            row["Symbols Check"]
-                        ).replace("\n", "</br>")
-                        if no_err > 1:
-                            td(name, rowspan=no_err)
-                            td(path, rowspan=no_err)
-                            if vendor != "":
-                                td(vendor, rowspan=no_err)
-                            else:
-                                tv = td("no vendor information", rowspan=no_err)
-                                tv.set_attribute("class", "detail_no_vendor")
-                                r.set_attribute("class", "warning_row_border")
-                            td(signature, rowspan=no_err)
-                            td(distribution, rowspan=no_err)
-                            t_w = td(d_err[0])
-                            t_w.set_attribute("class", "supported_failed")
-                            if sym_check == "":
-                                t = td("All passed!", rowspan=no_err)
-                                t.set_attribute("class", "detail_pass")
-                            else:
-                                t_w = td(raw(sym_check), rowspan=no_err)
-                                t_w.set_attribute("class", "sym_check_failed")
-                                r.set_attribute("class", "warning_row_border")
-                            for val in d_err[1:]:
-                                with tr() as r:
-                                    r.set_attribute("class", "warning_row_border")
-                                    t_w = td(val)
-                                    t_w.set_attribute("class", "supported_failed")
+                        if row_passed:
+                           r.set_attribute("class", "summary_great_row")
+                        if vendor != "":
+                            td(vendor)
                         else:
-                            td(name)
-                            td(path)
-                            if vendor != "":
-                                td(vendor)
+                            tv = td("no vendor information")
+                            tv.set_attribute("class", "important_failed")
+                        with td(total_rpms) as t:
+                            t.set_attribute("class", "summary_total")
+                        with td(s_yes) as t:
+                            if int(s_yes.split(" ")[0]) != 0:
+                                t.set_attribute(
+                                    "class", "critical_failed summary_number"
+                                )
                             else:
-                                tv = td("no vendor information")
-                                tv.set_attribute("class", "detail_no_vendor")
-                                r.set_attribute("class", "warning_row_border")
-                            td(signature)
-                            td(distribution)
-                            if no_err > 0:
-                                t_w = td(d_err[0])
-                                t_w.set_attribute("class", "supported_failed")
+                                t.set_attribute("class", "summary_number")
+                        with td(s_external) as t:
+                            t.set_attribute("class", "summary_number")
+                        with td(s_missing) as t:
+                            if int(s_missing.split(" ")[0]) != 0:
+                                t.set_attribute(
+                                    "class", "critical_failed summary_number"
+                                )
                             else:
-                                t = td("All passed!")
-                                t.set_attribute("class", "detail_pass")
-                            if sym_check == "":
-                                t = td("All passed!")
-                                t.set_attribute("class", "detail_pass")
+                                t.set_attribute("class", "summary_number")
+                        with td(s_multiple) as t:
+                            if int(s_multiple.split(" ")[0]) != 0:
+                                t.set_attribute(
+                                    "class", "critical_failed summary_number"
+                                )
                             else:
-                                t_w = td(raw(sym_check))
-                                t_w.set_attribute("class", "sym_check_failed")
-                                r.set_attribute("class", "warning_row_border")
+                                t.set_attribute("class", "summary_number")
+                        with td(sym_failed) as t:
+                            if int(sym_failed.split(" ")[0]) != 0:
+                                t.set_attribute(
+                                    "class", "critical_failed summary_number"
+                                )
+                            else:
+                                t.set_attribute("class", "summary_number")
+                        with td(sym_pass) as t:
+                            t.set_attribute("class", "summary_number")
 
-        with open(file, "w") as f:
-            f.write(report.render())
+        return tb
+
+    def _get_table_detail_html(self, rpm_table):
+        tb = table()
+        with tb:
+            tb.set_attribute("class", "table_center")
+            with tr():
+                cols = rpm_table.columns
+                for col in cols:
+                    if col == "Path":
+                        tp = th(col)
+                        tp.set_attribute("class", "detail_path")
+                    else:
+                        th(col)
+
+            for i, row in rpm_table.iterrows():
+                supported = row["Driver Flag: supported"]
+                d_err = self._get_supported_driver_failed(supported)
+                no_err = len(d_err)
+                with tr() as r:
+                    if no_err > 0:
+                        r.set_attribute("class", "critical_failed_row")
+                    name = row["Name"]
+                    path = row["Path"]
+                    vendor = row["Vendor"]
+                    signature = row["Signature"]
+                    distribution = row["Distribution"]
+                    sym_check = self._get_sym_check_failed(
+                        row["Symbols Check"]
+                    ).replace("\n", "</br>")
+                    if no_err > 1:
+                        td(name, rowspan=no_err)
+                        td(path, rowspan=no_err)
+                        if vendor != "":
+                            td(vendor, rowspan=no_err)
+                        else:
+                            tv = td("no vendor information", rowspan=no_err)
+                            tv.set_attribute("class", "important_failed")
+                            # r.set_attribute("class", "important_failed_row")
+                        if signature != "":
+                            td(signature, rowspan=no_err)
+                        else:
+                            ts = td(signature, rowspan=no_err)
+                            ts.set_attribute("class", "important_failed")
+                        td(distribution, rowspan=no_err)
+                        t_w = td(d_err[0])
+                        t_w.set_attribute("class", "critical_failed")
+                        if sym_check == "":
+                            t = td("All passed!", rowspan=no_err)
+                            t.set_attribute("class", "detail_pass")
+                        else:
+                            t_w = td(raw(sym_check), rowspan=no_err)
+                            t_w.set_attribute("class", "critical_failed")
+                            r.set_attribute("class", "critical_failed_row")
+                        for val in d_err[1:]:
+                            with tr() as r:
+                                r.set_attribute("class", "critical_failed_row")
+                                t_w = td(val)
+                                t_w.set_attribute("class", "critical_failed")
+                    else:
+                        td(name)
+                        td(path)
+                        if vendor != "":
+                            td(vendor)
+                        else:
+                            tv = td("no vendor information")
+                            tv.set_attribute("class", "important_failed")
+                            r.set_attribute("class", "important_failed_row")
+                        if signature != "":
+                            td(signature)
+                        else:
+                            ts = td(signature)
+                            ts.set_attribute("class", "important_failed")
+                        td(distribution)
+                        if no_err > 0:
+                            t_w = td(d_err[0])
+                            t_w.set_attribute("class", "critical_failed")
+                        else:
+                            t = td("All passed!")
+                            t.set_attribute("class", "detail_pass")
+                        if sym_check == "":
+                            t = td("All passed!")
+                            t.set_attribute("class", "detail_pass")
+                        else:
+                            t_w = td(raw(sym_check))
+                            t_w.set_attribute("class", "critical_failed")
+                            r.set_attribute("class", "critical_failed_row")
+
+        return tb
+
+    def to_html(self, rpm_table, file):
+        pkg_path = os.path.dirname(__file__)
+        jinja_tmpl = f"{pkg_path}/../config/templates"
+        file_loader = FileSystemLoader(jinja_tmpl)
+        env = Environment(loader=file_loader)
+
+        rpm_tmpl = env.get_template('rpm-checks.html.jinja')
+
+        rpm_checks = rpm_tmpl.render(summary_table=self._get_summary_table_html(rpm_table),
+                             rpm_details=self._get_table_detail_html(rpm_table))
+
+        with open(file, 'w') as f:
+            f.write(rpm_checks)
 
     def to_json(self, rpm_table, file):
         rpm_table.to_json(file, orient="records")
@@ -397,7 +406,9 @@ class RPMsExporter:
         ws_ov[c_name].alignment = Alignment(
             horizontal="center", vertical="center", wrap_text=False
         )
-        ws_ov[c_name].fill = PatternFill(start_color="30BA78", end_color="30BA78", fill_type="solid")
+        ws_ov[c_name].fill = PatternFill(
+            start_color="30BA78", end_color="30BA78", fill_type="solid"
+        )
         ws_ov[c_name].font = Font(name=ft_name, size=18, bold=True)
         ws_ov.merge_cells("A1:J1")
 
@@ -466,7 +477,11 @@ class RPMsExporter:
         for row in dataframe_to_rows(sm_table, index=False, header=True):
             ws_vs.append(row)
 
-        header_font, header_border, header_fill = self._style.get_rpm_xslx_table_header()
+        (
+            header_font,
+            header_border,
+            header_fill,
+        ) = self._style.get_rpm_xslx_table_header()
         for cell in ws_vs[1]:
             cell.font = header_font
             cell.border = header_border
@@ -477,7 +492,11 @@ class RPMsExporter:
                 cell.border = header_border
 
         last_record_row_no = len(sm_table.index) + 1
-        great_font, great_border, great_fill = self._style.get_rpm_xslx_table_great_row()
+        (
+            great_font,
+            great_border,
+            great_fill,
+        ) = self._style.get_rpm_xslx_table_great_row()
         great_row_style = DifferentialStyle(
             font=great_font,
             border=great_border,
@@ -513,14 +532,22 @@ class RPMsExporter:
 
     def _xlsx_create_rpm_details(self, wb, rpm_table):
         ws_rd = wb.create_sheet("RPMs details")
-        normal_font, normal_border, normal_fill = self._style.get_rpm_xslx_table_normal()
+        (
+            normal_font,
+            normal_border,
+            normal_fill,
+        ) = self._style.get_rpm_xslx_table_normal()
         normal_align = Alignment(horizontal="left", vertical="top", wrap_text=True)
         center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
         warn_font, warn_border, warn_fill = self._style.get_rpm_xslx_table_warning()
-        header_font, header_border, header_fill = self._style.get_rpm_xslx_table_header()
+        (
+            header_font,
+            header_border,
+            header_fill,
+        ) = self._style.get_rpm_xslx_table_header()
 
         cols = rpm_table.columns
-        xlsx_cols = list(string.ascii_lowercase[0:len(cols)])
+        xlsx_cols = list(string.ascii_lowercase[0 : len(cols)])
         for i in range(len(xlsx_cols)):
             cell_no = xlsx_cols[i] + "1"
             ws_rd[cell_no] = cols[i]
@@ -605,17 +632,13 @@ class RPMsExporter:
 
         ws_rd.conditional_formatting.add(sym_area, mismatch_rule)
 
-        empty_vendor =Rule(type="expression", dxf=ds_warn)
+        empty_vendor = Rule(type="expression", dxf=ds_warn)
         empty_vendor.formula = ['$C2 = ""']
         ws_rd.conditional_formatting.add(f"C2:C{records}", empty_vendor)
 
-        warn_row_style = DifferentialStyle(
-            border=warn_border
-        )
+        warn_row_style = DifferentialStyle(border=warn_border)
         warn_row = Rule(type="expression", dxf=warn_row_style)
-        warn_row.formula = [
-            'OR($F2 <> "All passed!", $G2 <> "All passed!", $C2 = "")'
-        ]
+        warn_row.formula = ['OR($F2 <> "All passed!", $G2 <> "All passed!", $C2 = "")']
         ws_rd.conditional_formatting.add(f"A2:G{records}", warn_row)
 
     def _xlsx_create_report_workbook(self):
@@ -685,7 +708,47 @@ class DriversExporter:
 
     def _fmt_warning_row_border(self, row):
         border = self._style.get_driver_html_warning_row()
-        return [f"border:{border}" if (row["Flag: supported"] != "external" and row["Flag: supported"] != "yes") or "is not owned by any package" in row["RPM Information"] else "" for r in row]
+        return [
+            f"border:{border}"
+            if (
+                row["Flag: supported"] != "external" and row["Flag: supported"] != "yes"
+            )
+            or "is not owned by any package" in row["RPM Information"]
+            else ""
+            for r in row
+        ]
+
+    def _driver_path_check(self, driver_path):
+        return re.match(
+            r"^/lib/modules/[0-9]+.[0-9]+.[0-9]+\-[0-9]+\-[a-z]+/(updates/|weak-updates/|extra/)",
+            driver_path,
+        )
+
+    def _is_kernel_extra_rpm(self, rpm_info):
+        return re.match(r"^kernel-default-extra", rpm_info)
+
+    def _format_row_html(self, row):
+        path = row["Path"]
+        supported = row["Flag: supported"]
+        rpm_info = row["RPM Information"]
+
+        warn_bgColor = self._style.get_driver_html_warning_data()
+
+        name_style = ""
+        path_style = ""
+        supported_style = ""
+        running_style = ""
+        suse_release_style = ""
+        rpm_info_style = ""
+
+        return [
+            name_style,
+            path_style,
+            supported_style,
+            suse_release_style,
+            running_style,
+            rpm_info_style,
+        ]
 
     def to_json(self, driver_tables, file):
         jf = dict()
@@ -700,50 +763,42 @@ class DriversExporter:
             json.dump(jf, fp)
 
     def to_html(self, driver_tables, file):
-        report = dominate.document(title="checking result from soliddriver-checks")
+        pkg_path = os.path.dirname(__file__)
+        jinja_tmpl = f"{pkg_path}/../config/templates"
+        file_loader = FileSystemLoader(jinja_tmpl)
+        env = Environment(loader=file_loader)
 
-        with report:
-            with report.head:
-                style(self._style.get_driver_html_css())
-            with body():
-                div(raw("""<div>
-            <h1 style="text-align: center; font-size:x-large;background-color: #30BA78;">Solid driver check result (Drivers)</h1>
-        </dev>
-        <p style="font-size:large;">soliddriver-checks is a tool for parnter(s) and customer(s) to check their drivers installed and RPMs to ensure these are meet basic SUSE requirements.</p>
-    <p>What do we check for drivers?</p>
-    <ul style="font-size:x-small">
-      <li>supported flag: 
-      <ul>
-          <li>'yes' means this package is built by SUSE and supported by SUSE</li>
-          <li>'external' means this package is built by vendor and supported by both SUSE and vendor</li>
-          <li>'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag</li>
-          Please contact your IHV or who provide this package to you if it's highlighted, we don't recommend you install it.
-      </ul>
-      </li>
-      <li>RPM information: means which RPM have this driver installed</li>
-      <li>SUSE Release: this driver was built for which SUSE OS version</li>
-    </ul>"""))
-                for label, dt in driver_tables.items():
-                    df = dt.copy()
-                    df.loc[df["Running"] == "True", "Running"] = "&#9989;"
-                    df.loc[df["Running"] == "False", "Running"] = "&#9940;"
-                    ts = df.style.hide_index()\
-                           .set_table_attributes('class="table_center"')\
-                           .applymap(self._fmt_rpm_info, subset=pd.IndexSlice[:, ["RPM Information"]])\
-                           .applymap(self._fmt_supported_flag, subset=pd.IndexSlice[:, ["Flag: supported"]])\
-                           .apply(self._fmt_warning_row_border, axis=1)
+        driver_tmpl = env.get_template('driver-checks.html.jinja')
 
-                    with div():
-                        detail_table = p('Solid Driver Checking Result: %s' % label)
-                        detail_table.set_attribute(
-                                        "style",
-                                        "text-align: center; font-size:large;background-color: #30BA78;",
-                                        )
+        details = []
+        for label, dt in driver_tables.items():
+            if dt is None:
+                details.append({"name": label, "table": "Connect error!"})
+                continue
 
-                    raw(ts.render())
+            df = dt.copy()
+            df.loc[df["Running"] == "True", "Running"] = "&#9989;"
+            df.loc[df["Running"] == "False", "Running"] = "&#9940;"
+            ts = (
+                df.style.hide_index()
+                .set_table_attributes('class="table_center"')
+                .applymap(
+                    self._fmt_rpm_info,
+                    subset=pd.IndexSlice[:, ["RPM Information"]],
+                )
+                .applymap(
+                    self._fmt_supported_flag,
+                    subset=pd.IndexSlice[:, ["Flag: supported"]],
+                )
+                .apply(self._fmt_warning_row_border, axis=1)
+            )
 
-        with open(file, "w") as f:
-            f.write(report.render())
+            details.append({"name": label, "table": ts.render()})
+
+        driver_checks = driver_tmpl.render(details=details)
+
+        with open(file, 'w') as f:
+            f.write(driver_checks)
 
     def _xlsx_create_overview(self, wb):
         pass
@@ -753,7 +808,11 @@ class DriversExporter:
         for row in dataframe_to_rows(driver_table, index=False, header=True):
             ws_dc.append(row)
 
-        header_font, header_border, header_fill = self._style.get_driver_xslx_table_header()
+        (
+            header_font,
+            header_border,
+            header_fill,
+        ) = self._style.get_driver_xslx_table_header()
         for cell in ws_dc[1]:
             cell.font = header_font
             cell.border = header_border
@@ -779,9 +838,7 @@ class DriversExporter:
         rpm_failed.formula = ['ISNUMBER(SEARCH("is not owned by any package", $F2))']
         ws_dc.conditional_formatting.add(f"F2:F{last_record_row_no}", rpm_failed)
 
-        warn_row_style = DifferentialStyle(
-            border=warn_border
-        )
+        warn_row_style = DifferentialStyle(border=warn_border)
         warn_row = Rule(type="expression", dxf=warn_row_style)
         warn_row.formula = [
             'OR(AND($C2 <> "external", $C2 <> "yes"), ISNUMBER(SEARCH("is not owned by any package", $F2)))'
