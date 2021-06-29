@@ -37,9 +37,11 @@ Usage: soliddriver-checks [OPTIONS] [CHECK_TARGET]
     default is local system
 
 Options:
-  -f, --format [html|excel|pdf|all]
-                                  Specify output format, default is html, the
-                                  default output is $(pwd)/check_result.html
+  -f, --format [json|html|excel|pdf|all]
+  				  Specify output format, default is html,all
+				  data can be saved in json format, html|excel|
+				  pdf are optimized for better view. The
+                                  default output is $(pwd)/check_result.json
   -q, --query [suse|other|unknown|all]
                                   Filter results based on vendor tag from rpm
                                   package providing module. "suse" = SUSE,
