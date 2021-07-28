@@ -8,6 +8,7 @@ import re
 from collections import namedtuple
 import tempfile
 from paramiko.ssh_exception import NoValidConnectionsError, SSHException
+import numpy as np
 
 
 def get_cmd_all_drivers_modinfo():
@@ -66,13 +67,16 @@ class RPMReader:
     def __init__(self, progress):
         self._progress = progress
         self._columns = [
-            "Name",
-            "Path",
-            "Vendor",
-            "Signature",
-            "Distribution",
-            "Driver Flag: supported",
-            "Symbols Check",
+            "name",
+            "path",
+            "vendor",
+            "signature",
+            "distribution",
+            "license",
+            "wm-invoked",
+            "df-supported",
+            "sym-check",
+            "dv-licenses",
         ]
 
     def _driver_symbols_check(self, rpm_symbols, driver):
@@ -139,12 +143,33 @@ class RPMReader:
         else:
             return supported
 
+    def _get_driver_license(self, driver):
+        raw_info = run_cmd("/usr/sbin/modinfo %s" % driver)
+        raw_info = str(raw_info, "utf-8")
+        info_list = raw_info.splitlines()
+        for item in info_list:
+            values = item.split(":")
+            if len(values) < 2:
+                continue
+
+            if values[0].strip() == "license":
+                return ":".join(values[1:]).strip()
+
+        return ""
+
     def _fmt_driver_supported(self, drivers):
         supported = dict()
         for d in drivers:
             supported[d] = drivers[d]["supported"]
 
         return supported
+
+    def _fmt_driver_license(self, drivers):
+        licenses = dict()
+        for d in drivers:
+            licenses[d] = drivers[d]["license"]
+
+        return licenses
 
     def _fmt_driver_symbol(self, drivers):
         symbols = dict()
@@ -181,6 +206,7 @@ class RPMReader:
             item = dict()
             item["symbols"] = self._driver_symbols_check(mod_reqs, driver)
             item["supported"] = self._get_driver_supported(driver)
+            item["license"] = self._get_driver_license(driver)
 
             dpath = str(driver)
             dpath = dpath[dpath.startswith(tmp.name) + len(tmp.name) - 1 :]
@@ -200,32 +226,52 @@ class RPMReader:
             signature = ""
             distribution = ""
             vendor = ""
+            license = ""
+            wm2_invoked = False
             for item in info:
+                if "/usr/lib/module-init-tools/weak-modules2" in item:
+                    wm2_invoked = True
+
                 values = item.split(":")
                 if len(values) < 2:
                     continue
 
                 if values[0].strip() == "Signature":
-                    signature = ":".join(values[1:])
+                    signature = ":".join(values[1:]).strip()
                 elif values[0].strip() == "Distribution":
-                    distribution = ":".join(values[1:])
+                    distribution = ":".join(values[1:]).strip()
                 elif values[0].strip() == "Vendor":
-                    vendor = ":".join(values[1:])
+                    vendor = ":".join(values[1:]).strip()
+                elif values[0].strip() == "License":
+                    license = ":".join(values[1:]).strip()
 
             driver_checks = self._driver_checks(rpm)
 
-            supported = ""
-            symbols = ""
+            supported = dict()
+            symbols = dict()
+            d_licenses = dict()
             if driver_checks is not None:
                 supported = self._fmt_driver_supported(driver_checks)
                 symbols = self._fmt_driver_symbol(driver_checks)
+                d_licenses = self._fmt_driver_license(driver_checks)
 
             if not self._query_filter(supported, query):
                 continue
 
             for handler in row_handlers:
                 handler(
-                    [name, rpm, vendor, signature, distribution, supported, symbols]
+                    [
+                        name,
+                        rpm,
+                        vendor,
+                        signature,
+                        distribution,
+                        license,
+                        wm2_invoked,
+                        supported,
+                        symbols,
+                        d_licenses,
+                    ]
                 )
 
             self._progress.console.print(
@@ -236,7 +282,17 @@ class RPMReader:
             self._progress.console.print("vendor         : %s" % vendor)
             self._progress.console.print("signature      : %s" % signature)
             self._progress.console.print("disturibution  : %s" % distribution)
-            if "Missing" in supported or "yes" in supported:
+            self._progress.console.print("license        : %s" % license)
+            if wm2_invoked:
+                self._progress.console.print("weak module    : %s" % str(wm2_invoked))
+            else:
+                self._progress.console.print("[bold red]weak module    : %s[/]" % str(wm2_invoked))
+            if (
+                "Missing" in supported
+                or "yes" in supported
+                or "no" in supported
+                or "Multiple" in supported
+            ):
                 self._progress.console.print(
                     "[bold red]supported flag : failed \n%s[/]" % supported
                 )
@@ -249,6 +305,17 @@ class RPMReader:
             else:
                 self._progress.console.print("symbols checks : success")
 
+            license_check = True
+            for k in d_licenses:
+                if d_licenses[k] != license:
+                    license_check = False
+                    break
+
+            if license_check:
+                self._progress.console.print("license check: success")
+            else:
+                self._progress.console.print("[bold red]license check: failed[/]")
+
             self._progress.advance(self._task)
 
     def _query_filter(self, supported, query):
@@ -258,7 +325,9 @@ class RPMReader:
             return True
         elif query == "vendor" and ": external" in supported:
             return True
-        elif query == "unknow" and (": Missing" in supported or ": Multiple" in supported):
+        elif query == "unknow" and (
+            ": Missing" in supported or ": Multiple" in supported
+        ):
             return True
 
         return False
@@ -280,7 +349,7 @@ class RPMReader:
             total=len(rpm_files),
         )
 
-        rpm_infos = run_cmd("rpm -qpi --nosignature $(%s)" % cmd_rpms)
+        rpm_infos = run_cmd("rpm -qpi --nosignature --scripts $(%s)" % cmd_rpms)
 
         if row_handlers is None:
             row_handlers = []
@@ -293,7 +362,7 @@ class RPMReader:
 
     def get_rpm_info(self, rpmfile):
         self._rpm_df = pd.DataFrame(columns=self._columns)
-        rpm_infos = run_cmd("rpm -qpi --nosignature %s" % rpmfile)
+        rpm_infos = run_cmd("rpm -qpi --nosignature --scripts %s" % rpmfile)
 
         self._format_rpm_info([rpmfile.name], rpm_infos, [self._add_row])
 
@@ -304,12 +373,15 @@ class DriverReader:
     def __init__(self, progress):
         self._progress = progress
         self._columns = [
-            "Name",
-            "Path",
-            "Flag: supported",
-            "SUSE Release",
-            "Running",
-            "RPM Information",
+            "name",
+            "path",
+            "flag_supported",
+            "license",
+            "signature",
+            "os-release",
+            "running",
+            "rpm",
+            "rpm_sig_key",
         ]
         self._ssh = None
 
@@ -335,11 +407,11 @@ class DriverReader:
     def _query_filter(self, supported, query="all"):
         if query == "all":
             return True
-        elif query == "suse" and supported == "yes":
+        elif query == "suse" and len(supported) == 1 and supported[0] == "yes":
             return True
-        elif query == "vendor" and supported == "external":
+        elif query == "vendor" and len(supported) == 1 and supported[0] == "external":
             return True
-        elif query == "unknow" and (supported == "Missing" or supported == "Multiple"):
+        elif query == "unknow" and (len (supported) == 0 or len(supported) > 1):
             return True
 
         return False
@@ -392,6 +464,37 @@ class DriverReader:
 
         return files
 
+    def _get_rpm_sig_key(self, df_drivers, remote):
+        rpms = df_drivers.rpm.unique()
+        rpms = [r for r in rpms if "not owned by any package" not in r]
+
+        if len(rpms) < 1:
+            return dict()
+
+        rpmInfo = ""
+        if remote:
+            rpmInfo = run_cmd("rpm -qi %s" % (" ".join(rpms)), self._ssh)
+        else:
+            rpmInfo = run_cmd("rpm -qi %s" % (" ".join(rpms)))
+
+        rpmInfo = str(rpmInfo, "utf-8").split("Name        :")
+        rpmInfo = rpmInfo[1:]
+        sig_keys = dict()
+        for i, rpm in enumerate(rpms):
+            info = rpmInfo[i].splitlines()
+            key = ""
+            for item in info:
+                values = item.split(":")
+                if len(values) < 2:
+                    continue
+
+                if values[0].strip() == "Signature":
+                    key = ":".join(values[1:]).strip()
+                    key = key[key.index("Key ID")+7:].strip()
+            sig_keys[rpm] = key
+
+        return sig_keys
+
     def _fill_driver_rpm_info(
         self, driver_files, item_handler, rpm_table, query, remote
     ):
@@ -414,20 +517,29 @@ class DriverReader:
 
             start = end + 1
 
-    def _add_row_handler(self, rpm_table, rpm_info, index, query):
-        if rpm_info == "":
+        rpm_sig_keys = self._get_rpm_sig_key(self._driver_df, remote)
+
+        for i, row in self._driver_df.iterrows():
+            if "not owned by any package" not in row["rpm"]:
+                row["rpm_sig_key"] = rpm_sig_keys[row["rpm"]]
+
+    def _add_row_handler(self, rpm_table, rpm, index, query):
+        if rpm == "":
             return
 
-        supported = rpm_table[index]["supported"]
+        supported = rpm_table[index]["flag_supported"]
         self._progress.advance(self._task)
         if self._query_filter(supported, query):
             row = [
                 rpm_table[index]["name"],
                 rpm_table[index]["path"],
                 supported,
-                rpm_table[index]["suserelease"],
+                rpm_table[index]["license"],
+                rpm_table[index]["signature"],
+                rpm_table[index]["os-release"],
                 rpm_table[index]["running"],
-                rpm_info,
+                rpm.strip(),
+                ""
             ]
             self._driver_df = self._driver_df.append(
                 pd.Series(row, index=self._columns), ignore_index=True
@@ -462,9 +574,11 @@ class DriverReader:
             driver = driver.splitlines()
             filename = driver[0].strip()
             name = ""
-            supported = "Missing"
+            supported = []
             suserelease = "Missing"
             running = str(filename in running_driver_files)
+            license = ""
+            signature = ""
 
             driver = driver[1:]
 
@@ -474,24 +588,27 @@ class DriverReader:
                     continue
 
                 if values[0] == "supported":
-                    if supported != "Missing":  # Only allow appears once.
-                        supported = "Multiple"
-                    else:
-                        supported = ":".join(values[1:]).strip()
+                    supported.append(":".join(values[1:]).strip())
                 elif values[0] == "suserelease":
                     suserelease = ":".join(values[1:]).strip()
                 elif values[0] == "name":
                     name = ":".join(values[1:]).strip()
+                elif values[0] == "license":
+                    license = ":".join(values[1:]).strip()
+                elif values[0] == "signature":
+                    signature = True
 
             if name == "":
                 name = Path(filename).name
             rpm_set = {
                 "name": name,
                 "path": filename,
-                "supported": supported,
-                "suserelease": suserelease,
+                "flag_supported": supported,
+                "license": license,
+                "signature": signature,
+                "os-release": suserelease,
                 "running": running,
-                "rpm_info": "",
+                "rpm": "",
             }
 
             rpm_table.append(rpm_set)
