@@ -478,7 +478,7 @@ class DriverReader:
             rpmInfo = run_cmd("rpm -qi %s" % (" ".join(rpms)))
 
         rpmInfo = str(rpmInfo, "utf-8").split("Name        :")
-        rpmInfo = rpmInfo[1:]
+        rpmInfo = rpmInfo[1:]  # Skip "Name      :"
         sig_keys = dict()
         for i, rpm in enumerate(rpms):
             info = rpmInfo[i].splitlines()

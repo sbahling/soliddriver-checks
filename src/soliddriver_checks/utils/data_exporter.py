@@ -7,7 +7,7 @@ from pathlib import Path
 import dominate
 from dominate.tags import html, body, h1, div, tr, td, th, table, style, ul, li, p
 from dominate.util import raw
-from openpyxl.styles import PatternFill, Font, Border, Side, Alignment, NamedStyle
+from openpyxl.styles import PatternFill, Font, Border, Side, Alignment, NamedStyle, borders
 from openpyxl.styles.differential import DifferentialStyle
 from openpyxl import load_workbook
 from openpyxl.formatting.rule import Rule
@@ -19,6 +19,7 @@ from openpyxl import Workbook
 import time
 from jinja2 import Environment, FileSystemLoader
 import re
+from copy import copy
 
 
 class SDCConf:
@@ -38,6 +39,7 @@ class SDCConf:
             name=conf["font"]["family"],
             size=conf["font"]["size"],
             bold=conf["font"]["bold"],
+            color=conf["font"]["color"],
         )
         sd = Side(
             border_style=conf["side"]["border_style"], color=conf["side"]["color"]
@@ -60,8 +62,11 @@ class SDCConf:
     def get_rpm_xslx_table_normal(self):
         return self._get_xlsx_info("rpm-check", "excel", "table", "data", "normal")
 
-    def get_rpm_xslx_table_warning(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "data", "warning")
+    def get_rpm_xslx_table_important_failed(self):
+        return self._get_xlsx_info("rpm-check", "excel", "table", "data", "important-failed")
+    
+    def get_rpm_xslx_table_critical_failed(self):
+        return self._get_xlsx_info("rpm-check", "excel", "table", "data", "critical-failed")
 
     def get_rpm_xslx_table_great_row(self):
         return self._get_xlsx_info("rpm-check", "excel", "table", "row", "great")
@@ -84,8 +89,11 @@ class SDCConf:
     def get_driver_xslx_table_normal(self):
         return self._get_xlsx_info("driver-check", "excel", "table", "data", "normal")
 
-    def get_driver_xslx_table_warning(self):
-        return self._get_xlsx_info("driver-check", "excel", "table", "data", "warning")
+    def get_driver_xslx_table_important_failed(self):
+        return self._get_xlsx_info("driver-check", "excel", "table", "data", "important-failed")
+
+    def get_driver_xslx_table_critical_failed(self):
+        return self._get_xlsx_info("driver-check", "excel", "table", "data", "critical-failed")
 
     def get_driver_xslx_table_warn_row(self):
         return self._get_xlsx_info("driver-check", "excel", "table", "row", "warn")
@@ -97,6 +105,32 @@ def ValidLicense(license, licenses):
             return True
 
     return False
+
+
+class ExcelTemplate:
+    def __init__(self):
+        pkg_path = os.path.dirname(__file__)
+        self._cfg_path = f"{pkg_path}/../config/templates/templates.xlsx"
+
+    def set_driver_check_overview(self, ws):
+        self._copy_work_sheep("driver-check-summary", ws)
+
+    def set_rpm_check_overview(self, ws):
+        self._copy_work_sheep("rpm-check-summary", ws)
+
+    def _copy_work_sheep(self, title, ws):
+        tmpl = load_workbook(filename=self._cfg_path)
+        cover = tmpl[title]
+
+        ws.title = "Overview"
+        for row in cover.rows:
+            for cell in row:
+                ws[cell.coordinate].value = copy(cell.value)
+                # ws[cell.coordinate].style = copy(cell.style)
+                ws[cell.coordinate].font = copy(cell.font)
+                ws[cell.coordinate].border = copy(cell.border)
+                ws[cell.coordinate].fill = copy(cell.fill)
+                ws[cell.coordinate].alignment = copy(cell.alignment)
 
 
 class RPMsExporter:
@@ -159,8 +193,7 @@ class RPMsExporter:
                 "Vendor",
                 "Total rpms",
                 "Supported:external",
-                "No License or not GPL 2 compatible",
-                "Licenses mismatch",
+                "License",
                 "Signature",
                 "Weak Module Invoked",
                 "Symbols Check Failed",
@@ -181,24 +214,21 @@ class RPMsExporter:
 
             return num
 
-        def lic_mismatch_count(rpm_licenses, driver_licenses):
+        def license_check(vld_lics, rpm_licenses, driver_license):
             count = 0
             for idx, rl in rpm_licenses.items():
-                d_lics = driver_licenses[idx]
-                for driver in d_lics:
-                    if d_lics[driver] != rl:
-                        count += 1
-                        break
-
-            return count
-
-        def nolic_or_not_gpl2_compatible_count(rpm_licenses):
-            count = 0
-            for rl in rpm_licenses:
-                if not ("GPL" in rl):
+                if ValidLicense(rl, vld_lics):
                     count += 1
+                else:
+                    d_lics = driver_license[idx]
+                    for dl in d_lics:
+                        if ValidLicense(dl, vld_lics):
+                            count += 1
+                            break
 
             return count
+
+        vld_lic = self._style.get_valid_licenses()
 
         for v in vendors:
             df_vendor = df.loc[df["vendor"] == v]
@@ -209,8 +239,9 @@ class RPMsExporter:
                     df_vendor["sym-check"] == "failed", "sym-check"
                 ].index
             )
-            no_lic_or_not_gpl2 = nolic_or_not_gpl2_compatible_count(df_vendor["license"])
-            lic_mismatch = lic_mismatch_count(df_vendor["license"], df_vendor["dv-licenses"])
+            lic_check = license_check(vld_lic,
+                                      df_vendor["license"],
+                                      df_vendor["dv-licenses"])
             no_sig = len(
                 df_vendor.loc[
                     df_vendor["signature"] != "", "signature"
@@ -225,8 +256,7 @@ class RPMsExporter:
                     "Vendor": v,
                     "Total rpms": total,
                     "Supported:external": f"{external} ({external/total * 100:.2f}%)",
-                    "No License or not GPL 2 compatible": f"{no_lic_or_not_gpl2} ({no_lic_or_not_gpl2/total * 100:.2f}%)",
-                    "Licenses mismatch": f"{lic_mismatch} ({lic_mismatch/total * 100:.2f}%)",
+                    "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
                     "Weak Module Invoked": f"{wm_invoked} ({wm_invoked/total * 100:.2f}%)",
                     "Symbols Check Failed": f"{failed} ({failed/total * 100:.2f}%)",
@@ -254,8 +284,7 @@ class RPMsExporter:
                     vendor = row["Vendor"]
                     total_rpms = row["Total rpms"]
                     s_external = row["Supported:external"]
-                    no_license = row["No License or not GPL 2 compatible"]
-                    mismatch_license = row["Licenses mismatch"]
+                    lic_check = row["License"]
                     signature = row["Signature"]
                     wm_invoked = row["Weak Module Invoked"]
                     sym_failed = row["Symbols Check Failed"]
@@ -264,8 +293,7 @@ class RPMsExporter:
                     if (
                         vendor != ""
                         and int(s_external.split(" ")[0]) == total_rpms
-                        and int(no_license.split(" ")[0]) == 0
-                        and int(mismatch_license.split(" ")[0]) == 0
+                        and int(lic_check.split(" ")[0]) == total_rpms
                         and int(signature.split(" ")[0]) == total_rpms
                         and int(wm_invoked.split(" ")[0]) == total_rpms
                         and int(sym_failed.split(" ")[0]) == 0
@@ -286,13 +314,8 @@ class RPMsExporter:
                                 t.set_attribute("class", "critial_failed summary_number")
                             else:
                                 t.set_attribute("class", "summary_number")
-                        with td(no_license) as t:
-                            if int(no_license.split(" ")[0]) != 0:
-                                t.set_attribute("class", "important_failed summary_number")
-                            else:
-                                t.set_attribute("class", "summary_number")
-                        with td(mismatch_license) as t:
-                            if int(mismatch_license.split(" ")[0]) != 0:
+                        with td(lic_check) as t:
+                            if int(lic_check.split(" ")[0]) != total_rpms:
                                 t.set_attribute("class", "important_failed summary_number")
                             else:
                                 t.set_attribute("class", "summary_number")
@@ -337,13 +360,13 @@ class RPMsExporter:
 
     def _fmt_driver_license_check(self, rpm_license, driver_licenses, vld_lics):
         chk_result = ""
-        if rpm_license not in vld_lics:
-            chk_result = f"RPM license doesn't supported: ${rpm_license}"
+        if not ValidLicense(rpm_license, vld_lics):
+            chk_result = f"RPM license doesn't supported: {rpm_license}"
             return chk_result
 
         un_supported_driver = dict()
         for key in driver_licenses:
-            if driver_licenses[key] not in vld_lics:
+            if not ValidLicense(driver_licenses[key], vld_lics):
                 un_supported_driver[key] = driver_licenses[key]
 
         if len(un_supported_driver) == 0:
@@ -354,7 +377,7 @@ class RPMsExporter:
                 if idx > 2:  # only show 3 result is enough, keep the table clear.
                     chk_result = f"{chk_result} ..."
                     break
-                chk_result = f"{chk_result} {Path(key).name} : {un_matched_driver[key]}\n"
+                chk_result = f"{chk_result} {Path(key).name} : {un_supported_driver[key]}\n"
 
         return chk_result
 
@@ -584,6 +607,35 @@ class RPMsExporter:
         ws_ov[c_name].border = bd
         ws_ov.merge_cells("A11:J11")
 
+    def _get_important_failed_style(self):
+        ipt_font, ipt_border, ipt_fill = self._style.get_rpm_xslx_table_important_failed()
+        return DifferentialStyle(
+            font=ipt_font,
+            border=ipt_border,
+            fill=ipt_fill,
+        )
+
+    def _get_critical_failed_style(self):
+        ctc_font, ctc_border, ctc_fill = self._style.get_rpm_xslx_table_critical_failed()
+        return DifferentialStyle(
+            font=ctc_font,
+            border=ctc_border,
+            fill=ctc_fill,
+        )
+
+    def _get_header_style(self):
+        (
+            header_font,
+            header_border,
+            header_fill,
+        ) = self._style.get_rpm_xslx_table_header()
+
+        return DifferentialStyle(
+            font=header_font,
+            border=header_border,
+            fill=header_fill,
+        )
+
     def _xlsx_create_vendor_summary(self, wb, rpm_table):
         ws_vs = wb.create_sheet("vendor summary")
         sm_table = self._get_summary_table(rpm_table)
@@ -595,6 +647,7 @@ class RPMsExporter:
             header_border,
             header_fill,
         ) = self._style.get_rpm_xslx_table_header()
+
         for cell in ws_vs[1]:
             cell.font = header_font
             cell.border = header_border
@@ -617,33 +670,39 @@ class RPMsExporter:
         )
         great_row = Rule(type="expression", dxf=great_row_style)
         great_row.formula = [
-            'AND(VALUE(LEFT($D2, FIND(" ",$D2)-1)) = $B2, VALUE(LEFT($G2, FIND(" ", $G2)-1)) = $B2)'
+            'AND($A2 <> "", VALUE(LEFT($C2, FIND(" ",$C2)-1))=$B2, VALUE(LEFT($D2, FIND(" ", $D2) - 1)) = $B2, VALUE(LEFT($E2, FIND(" ", $E2) - 1)) = $B2, VALUE(LEFT($F2, FIND(" ", $F2)-1))=$B2, VALUE(LEFT($G2, FIND(" ", $G2) - 1))=0)'
         ]
         ws_vs.conditional_formatting.add(f"A2:G{last_record_row_no}", great_row)
 
-        warn_font, warn_border, warn_fill = self._style.get_rpm_xslx_table_warning()
-        warning_style = DifferentialStyle(
-            font=warn_font,
-            border=warn_border,
-            fill=warn_fill,
-        )
-        empty_vendor = Rule(type="expression", dxf=warning_style)
+        ipt_style = self._get_important_failed_style()
+        ctc_style = self._get_critical_failed_style()
+
+        empty_vendor = Rule(type="expression", dxf=ipt_style)
         empty_vendor.formula = ['$A2 = ""']
         ws_vs.conditional_formatting.add(f"A2:A{last_record_row_no}", empty_vendor)
 
-        supported_yes = Rule(type="expression", dxf=warning_style)
-        supported_yes.formula = ['VALUE(LEFT($C2, FIND(" ", $C2) - 1)) <> 0']
-        ws_vs.conditional_formatting.add(f"C2:C{last_record_row_no}", supported_yes)
+        supported_failed = Rule(type="expression", dxf=ctc_style)
+        supported_failed.formula = ['VALUE(LEFT($C2, FIND(" ", $C2) - 1)) <> $B2']
+        ws_vs.conditional_formatting.add(f"C2:C{last_record_row_no}", supported_failed)
 
-        supported_missing = Rule(type="expression", dxf=warning_style)
-        supported_missing.formula = ['VALUE(LEFT($E2, FIND(" ", $E2) - 1)) <> 0']
-        ws_vs.conditional_formatting.add(f"E2:E{last_record_row_no}", supported_missing)
+        license_check = Rule(type="expression", dxf=ipt_style)
+        license_check.formula = ['VALUE(LEFT($D2, FIND(" ", $D2) - 1)) <> $B2']
+        ws_vs.conditional_formatting.add(f"D2:D{last_record_row_no}", license_check)
 
-        sym_failed = Rule(type="expression", dxf=warning_style)
-        sym_failed.formula = ['VALUE(LEFT($F2, FIND(" ", $F2) - 1)) <> 0']
-        ws_vs.conditional_formatting.add(f"F2:F{last_record_row_no}", sym_failed)
+        sig_check = Rule(type="expression", dxf=ipt_style)
+        sig_check.formula = ['VALUE(LEFT($E2, FIND(" ", $E2) - 1)) <> $B2']
+        ws_vs.conditional_formatting.add(f"E2:E{last_record_row_no}", sig_check)
+
+        wm_check = Rule(type="expression", dxf=ipt_style)
+        wm_check.formula = ['VALUE(LEFT($F2, FIND(" ", $F2) - 1)) <> $B2']
+        ws_vs.conditional_formatting.add(f"F2:F{last_record_row_no}", wm_check)
+
+        sym_failed = Rule(type="expression", dxf=ctc_style)
+        sym_failed.formula = ['VALUE(LEFT($G2, FIND(" ", $G2) - 1)) <> 0']
+        ws_vs.conditional_formatting.add(f"G2:G{last_record_row_no}", sym_failed)
 
     def _xlsx_create_rpm_details(self, wb, rpm_table):
+        df = self._rename_rpm_detail_columns(rpm_table)
         ws_rd = wb.create_sheet("RPMs details")
         (
             normal_font,
@@ -652,15 +711,18 @@ class RPMsExporter:
         ) = self._style.get_rpm_xslx_table_normal()
         normal_align = Alignment(horizontal="left", vertical="top", wrap_text=True)
         center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        warn_font, warn_border, warn_fill = self._style.get_rpm_xslx_table_warning()
+        imt_font, imt_border, imt_fill = self._style.get_rpm_xslx_table_important_failed()
+        ctc_font, ctc_border, ctc_fill = self._style.get_rpm_xslx_table_critical_failed()
+        ctc_style = self._get_critical_failed_style()
+        imt_style = self._get_important_failed_style()
         (
             header_font,
             header_border,
             header_fill,
         ) = self._style.get_rpm_xslx_table_header()
 
-        cols = rpm_table.columns
-        xlsx_cols = list(string.ascii_lowercase[0 : len(cols)])
+        cols = df.columns
+        xlsx_cols = list(string.ascii_lowercase[0:len(cols)])
         for i in range(len(xlsx_cols)):
             cell_no = xlsx_cols[i] + "1"
             ws_rd[cell_no] = cols[i]
@@ -668,15 +730,20 @@ class RPMsExporter:
             ws_rd[cell_no].fill = header_fill
             ws_rd[cell_no].border = header_border
 
+        ws_rd.column_dimensions["J"].hidden = True
+
         curr_row_no = 2
         supported_col_no = 0
 
         for i in range(len(cols)):
-            if cols[i] == "df-supported":
+            if cols[i] == "Driver Flag: Supported":
                 supported_col_no = i
                 break
 
-        for i, row in rpm_table.iterrows():
+        vld_lic = self._style.get_valid_licenses()
+
+        for i, row in df.iterrows():
+            rpm_license = row["License"]
             for col_idx in range(len(cols)):
                 cell_no = xlsx_cols[col_idx] + str(curr_row_no)
                 val = row[cols[col_idx]]
@@ -686,27 +753,47 @@ class RPMsExporter:
                 ws_rd[cell_no].border = normal_border
                 ws_rd[cell_no].alignment = normal_align
 
-                if cols[col_idx] == "sym-check":
+                if cols[col_idx] == "Symbols Check":
                     val = self._get_sym_check_failed(val)
                     if val == "":
                         val = "All passed!"
+                        ws_rd[cell_no] = val
                         ws_rd[cell_no].alignment = center_align
-                elif cols[col_idx] == "df-supported":
+                    else:
+                        ws_rd[cell_no] = val
+                elif cols[col_idx] == "Driver Flag: Supported":
                     val = "All passed!"
+                    ws_rd[cell_no] = val
                     ws_rd[cell_no].alignment = center_align
-                ws_rd[cell_no] = val
+                elif cols[col_idx] == "License":
+                    lcs_chk = self._fmt_driver_license_check(rpm_license, row["Driver Licenses"], vld_lic)
+                    if lcs_chk == "":
+                        if rpm_license == "":
+                            ws_rd[cell_no] = "No License"
+                            ws_rd[cell_no].font = imt_font
+                            ws_rd[cell_no].fill = imt_fill
+                            ws_rd[cell_no].border = imt_border
+                        else:
+                            ws_rd[cell_no] = rpm_license
+                    else:
+                        ws_rd[cell_no] = lcs_chk
+                        ws_rd[cell_no].font = imt_font
+                        ws_rd[cell_no].fill = imt_fill
+                        ws_rd[cell_no].border = imt_border
+                else:
+                    ws_rd[cell_no] = str(val)
 
             failed_drivers = self._get_supported_driver_failed(
-                row["df-supported"]
+                row["Driver Flag: Supported"]
             )
             driver_count = len(failed_drivers)
             if driver_count > 0:  # format supported information
                 for sp_idx in range(driver_count):
                     cell_no = xlsx_cols[supported_col_no] + str(curr_row_no + sp_idx)
                     ws_rd[cell_no] = failed_drivers[sp_idx]
-                    ws_rd[cell_no].font = warn_font
-                    ws_rd[cell_no].fill = warn_fill
-                    ws_rd[cell_no].border = warn_border
+                    ws_rd[cell_no].font = ctc_font
+                    ws_rd[cell_no].fill = ctc_fill
+                    ws_rd[cell_no].border = ctc_border
                     ws_rd[cell_no].alignment = normal_align
 
             if driver_count > 1:  # need merge cell
@@ -725,34 +812,24 @@ class RPMsExporter:
                 curr_row_no += driver_count
 
         records = curr_row_no
-        support_area = "F2:F" + str(records)
-        ds_warn = DifferentialStyle(font=warn_font, border=warn_border, fill=warn_fill)
 
-        support_flag_na_rule = Rule(
-            type="containsText", operator="containsText", text="Missing", dxf=ds_warn
-        )
-        support_flag_yes_rule = Rule(
-            type="containsText", operator="containsText", text="yes", dxf=ds_warn
-        )
-
-        ws_rd.conditional_formatting.add(support_area, support_flag_na_rule)
-        ws_rd.conditional_formatting.add(support_area, support_flag_yes_rule)
-
-        sym_area = "G2:G" + str(records)
-        mismatch_rule = Rule(
-            type="containsText", operator="containsText", text=".ko", dxf=ds_warn
-        )
-
-        ws_rd.conditional_formatting.add(sym_area, mismatch_rule)
-
-        empty_vendor = Rule(type="expression", dxf=ds_warn)
+        empty_vendor = Rule(type="expression", dxf=imt_style)
         empty_vendor.formula = ['$C2 = ""']
         ws_rd.conditional_formatting.add(f"C2:C{records}", empty_vendor)
 
-        warn_row_style = DifferentialStyle(border=warn_border)
-        warn_row = Rule(type="expression", dxf=warn_row_style)
-        warn_row.formula = ['OR($F2 <> "All passed!", $G2 <> "All passed!", $C2 = "")']
-        ws_rd.conditional_formatting.add(f"A2:G{records}", warn_row)
+        sf_rule = Rule(type="expression", dxf=ctc_style)
+        sf_rule.formula = ['=OR($H2="All passed!", AND(ISNUMBER(FIND(":", $H2)), ISNUMBER(FIND("external", $H2))))']
+        ws_rd.conditional_formatting.add(f"H2:H{records}", sf_rule)
+
+        sig_rule = Rule(type="expression", dxf=ctc_style)
+        sig_rule.formula = ['=$D2 <> ""']
+        ws_rd.conditional_formatting.add(f"D2:D{records}", sig_rule)
+
+        sym_rule = Rule(type="expression", dxf=ctc_style)
+        sym_rule.formula = ['=ISNUMBER(FIND(".ko", $I2))']
+        ws_rd.conditional_formatting.add(f"I2:I{records}", sym_rule)
+
+
 
     def _xlsx_create_report_workbook(self):
         wb = Workbook()
@@ -819,13 +896,6 @@ class DriversExporter:
             r"^/lib/modules/[0-9]+.[0-9]+.[0-9]+\-[0-9]+.[0-9]+\-[a-z]+/(updates/|weak-updates/|extra/)",
             driver_path,
             )
-
-    def _rpm_sig_key_check(self, rpm_sig_key):
-        for key in self._rpm_sig_keys:
-            if key["key"] == rpm_sig_key:
-                return True
-
-        return False
 
     def _format_row_html(self, row):
         path = row["path"]
@@ -937,6 +1007,7 @@ class DriversExporter:
                 details.append({"name": label, "table": "Connect error!"})
                 continue
 
+            total_drivers, tp_drivers, failed_drivers = self._get_server_summary(dt)
             df = dt.copy()
             df = self._get_third_party_drivers(df)
             df.loc[df["running"] == "True", "running"] = "&#9989;"
@@ -948,7 +1019,11 @@ class DriversExporter:
                 .apply(self._format_row_html, axis=1)
             )
 
-            details.append({"name": label, "table": ts.render()})
+            details.append({"name": label,
+                           "total_drivers": total_drivers,
+                           "third_party_drivers": tp_drivers,
+                           "failed_drivers": failed_drivers,
+                           "table": ts.render()})
 
         driver_checks = driver_tmpl.render(details=details)
 
@@ -956,7 +1031,30 @@ class DriversExporter:
             f.write(driver_checks)
 
     def _xlsx_create_overview(self, wb):
-        pass
+        et = ExcelTemplate()
+        et.set_driver_check_overview(wb.active)
+
+    def _get_failed_driver_count(self, df):
+        count = 0
+        vld_lic = self._style.get_valid_licenses()
+        for i, row in df.iterrows():
+            if ("is not owned by any package" in row["rpm"] or
+                row["flag_supported"] != "external" or
+                row["signature"] == "" or
+                self._driver_path_check(row["path"]) is None):
+                count += 1
+                continue
+
+        return count
+
+    def _get_server_summary(self, driver_table):
+        total_drivers = len(driver_table.index)
+        third_party_drivers = self._get_third_party_drivers(driver_table)
+        tpd_count = len(third_party_drivers.index)
+
+        failed_count = self._get_failed_driver_count(third_party_drivers)
+
+        return total_drivers, tpd_count, failed_count
 
     def _xlsx_create_table(self, wb, label, driver_table):
         ws_dc = wb.create_sheet(label)
@@ -964,6 +1062,7 @@ class DriversExporter:
             return
 
         df = self._get_third_party_drivers(driver_table)
+        df = self._refmt_supported(df)
         for row in dataframe_to_rows(df, index=False, header=True):
             ws_dc.append(row)
 
@@ -977,30 +1076,29 @@ class DriversExporter:
             cell.border = header_border
             cell.fill = header_fill
 
-        for row in ws_dc[f"A1:F{len(df.index)+1}"]:
+        last_record_row_no = len(df.index) + 1
+        for row in ws_dc[f"A1:H{last_record_row_no}"]:
             for cell in row:
                 cell.border = header_border
 
-        last_record_row_no = len(df.index) + 1
-
-        warn_font, warn_border, warn_fill = self._style.get_driver_xslx_table_warning()
-        warning_style = DifferentialStyle(
-            font=warn_font,
-            border=warn_border,
-            fill=warn_fill,
-        )
-        sup_failed = Rule(type="expression", dxf=warning_style)
+        imt_style = self._style.get_driver_xslx_table_important_failed()
+        ctc_style = self._style.get_driver_xslx_table_critical_failed()
+        sup_failed = Rule(type="expression", dxf=ctc_style)
         sup_failed.formula = ['AND($C2 <> "external", $C2 <> "yes")']
         ws_dc.conditional_formatting.add(f"C2:C{last_record_row_no}", sup_failed)
 
-        rpm_failed = Rule(type="expression", dxf=warning_style)
-        rpm_failed.formula = ['ISNUMBER(SEARCH("is not owned by any package", $F2))']
+        sig_check = Rule(type="expression", dxf=imt_style)
+        sig_check.formula = ['$E2 = ""']
+        ws_dc.conditional_formatting.add(f"E2:E{last_record_row_no}", sig_check)
+
+        rpm_failed = Rule(type="expression", dxf=ctc_style)
+        rpm_failed.formula = ['ISNUMBER(SEARCH("is not owned by any package", $H2))']
         ws_dc.conditional_formatting.add(f"H2:H{last_record_row_no}", rpm_failed)
 
         warn_row_style = DifferentialStyle(border=warn_border)
         warn_row = Rule(type="expression", dxf=warn_row_style)
         warn_row.formula = [
-            'OR(AND($C2 <> "external", $C2 <> "yes"), ISNUMBER(SEARCH("is not owned by any package", $H2)))'
+            'OR($C2 <> "external", ISNUMBER(SEARCH("is not owned by any package", $H2)))'
         ]
         ws_dc.conditional_formatting.add(f"A2:H{last_record_row_no}", warn_row)
 
