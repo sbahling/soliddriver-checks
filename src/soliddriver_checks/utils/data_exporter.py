@@ -1076,31 +1076,79 @@ class DriversExporter:
             cell.border = header_border
             cell.fill = header_fill
 
-        last_record_row_no = len(df.index) + 1
-        for row in ws_dc[f"A1:H{last_record_row_no}"]:
-            for cell in row:
-                cell.border = header_border
+        ctc_font, ctc_border, ctc_fill = self._style.get_driver_xslx_table_critical_failed()
+        imt_font, imt_border, imt_fill = self._style.get_driver_xslx_table_important_failed()
+        (
+            normal_font,
+            normal_border,
+            normal_fill,
+        ) = self._style.get_driver_xslx_table_normal()
+        vld_lic = self._style.get_valid_licenses()
 
-        imt_style = self._style.get_driver_xslx_table_important_failed()
-        ctc_style = self._style.get_driver_xslx_table_critical_failed()
-        sup_failed = Rule(type="expression", dxf=ctc_style)
-        sup_failed.formula = ['AND($C2 <> "external", $C2 <> "yes")']
-        ws_dc.conditional_formatting.add(f"C2:C{last_record_row_no}", sup_failed)
+        last_record_row_no = len(df.index) + 2   # the title of the table also count
+        for i in range(2, last_record_row_no):
+            # default format.
+            for cell in ws_dc[i]:
+                cell.font = normal_font
+                cell.border = normal_border
+                cell.fill = normal_fill
 
-        sig_check = Rule(type="expression", dxf=imt_style)
-        sig_check.formula = ['$E2 = ""']
-        ws_dc.conditional_formatting.add(f"E2:E{last_record_row_no}", sig_check)
+            path = ws_dc[f"B{i}"].value
+            flag = ws_dc[f"C{i}"].value.split(" ")
+            license = ws_dc[f"D{i}"].value
+            sig = ws_dc[f"E{i}"].value
+            rpm = ws_dc[f"H{i}"].value
 
-        rpm_failed = Rule(type="expression", dxf=ctc_style)
-        rpm_failed.formula = ['ISNUMBER(SEARCH("is not owned by any package", $H2))']
-        ws_dc.conditional_formatting.add(f"H2:H{last_record_row_no}", rpm_failed)
+            w_level = 0
 
-        warn_row_style = DifferentialStyle(border=warn_border)
-        warn_row = Rule(type="expression", dxf=warn_row_style)
-        warn_row.formula = [
-            'OR($C2 <> "external", ISNUMBER(SEARCH("is not owned by any package", $H2)))'
-        ]
-        ws_dc.conditional_formatting.add(f"A2:H{last_record_row_no}", warn_row)
+            if not ValidLicense(license, vld_lic):
+                w_level = 1
+                ws_dc[f"D{i}"].font = imt_font
+                ws_dc[f"D{i}"].border = imt_border
+                ws_dc[f"D{i}"].fill = imt_fill
+
+            if sig == "":
+                w_level = 1
+                ws_dc[f"E{i}"].font = imt_font
+                ws_dc[f"E{i}"].border = imt_border
+                ws_dc[f"E{i}"].fill = imt_fill
+
+            if not self._driver_path_check(path):
+                w_level = 2
+                ws_dc[f"B{i}"].font = imt_font
+                ws_dc[f"B{i}"].border = imt_border
+                ws_dc[f"B{i}"].fill = imt_fill
+
+            if (len(flag) == 0) or (len(flag) == 1 and flag[0] != "external"):
+                w_level = 2
+                ws_dc[f"C{i}"].font = ctc_font
+                ws_dc[f"C{i}"].border = ctc_border
+                ws_dc[f"C{i}"].fill = ctc_fill
+            elif len(flag) > 1:
+                v1 = flag[0]
+                if v1 != "external":
+                    warn_level = 2
+                    ws_dc[f"C{i}"].font = ctc_font
+                    ws_dc[f"C{i}"].border = ctc_border
+                    ws_dc[f"C{i}"].fill = ctc_fill
+                else:
+                    warn_level = 1
+                    ws_dc[f"C{i}"].font = imt_font
+                    ws_dc[f"C{i}"].border = imt_border
+                    ws_dc[f"C{i}"].fill = imt_fill
+                    for v in flag:
+                        if v != v1:
+                            warn_level = 2
+                            ws_dc[f"C{i}"].font = ctc_font
+                            ws_dc[f"C{i}"].border = ctc_border
+                            ws_dc[f"C{i}"].fill = ctc_fill
+                            break
+
+            if "is not owned by any package" in rpm:
+                warn_level = 2
+                ws_dc[f"H{i}"].font = ctc_font
+                ws_dc[f"H{i}"].border = ctc_border
+                ws_dc[f"H{i}"].fill = ctc_fill
 
     def to_excel(self, driver_tables, file):
         wb = Workbook()
