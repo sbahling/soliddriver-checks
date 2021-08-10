@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>checking result from soliddriver-checks</title>
+    <style>body {
+            font-family: 'Poppins';
+            font-size: 18px;
+            background-color: #EFEFEF;
+         }
+         table, th, td{
+            font-family: 'Poppins';
+            font-size: 12px;
+            border: 1px solid #30BA78;
+            border-collapse: collapse;
+            width: 90%;
+            table-layout: fixed;
+         }
+         .table_center{
+            margin-left: auto;
+            margin-right: auto;
+         }
+         th{
+            font-family: 'Poppins Medium';
+            background-color: #30BA78;
+         }
+         th.summary_vendor{
+            width:240px;
+         }
+         th.detail_1{
+             width:320px;
+         }
+         th.detail_2{
+          width:100px;
+         }
+         th.detail_3{
+          width:160px;
+         }
+         th.detail_4{
+          width:100px;
+         }
+         th.detail_6{
+           width:60px;
+         }
+         td{
+            text-align:left;
+            vertical-align: top;
+         }
+         td.detail_pass{
+            text-align: center;
+            vertical-align: middle; 
+         }
+         td.summary_number{
+            text-align: center;
+            vertical-align: middle;
+         }
+         td.summary_total{
+            text-align: right;
+            vertical-align: middle;
+         }
+         .supported_border{
+            border:none;
+         }
+         .summary_table {
+            width: 60%;
+            margin-left: auto;
+            margin-right: auto;
+         }
+         td.summary{
+            text-align: center;
+            vertical-align: middle;
+         }
+         tr.critical_failed_row{
+            border: 2px solid #C5161F;
+         }
+         tr.important_failed_row{
+            border: 2px solid #FF9E02;
+         }
+         td.critical_failed{
+            color: white;
+            background-color: #C5161F;
+         }
+         td.important_failed{
+            background-color: #FF9E02;
+         }
+         tr.summary_great_row{
+            background-color: #90EBCD;
+         }
+         td.warning_row_border{
+            border: 2px solid #FE7C3F
+         }
+    </style>
+  </head>
+  <body>
+    <div><div>
+      <h1 style="text-align: center; font-size:x-large;background-color: #30BA78;">Solid driver check result (RPMs)</h1>
+    </div>
+    <p style="font-size:small;">soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements.</p>
+    <p style="font-size:x-small">Please refer to <a href="https://drivers.suse.com/doc/kmpm/" style="background-color: #30BA78;">Kernel Module Packages Manual</a> to learn how to build a KMP(Kernel Module Package).</p>
+    <p>What do we check?</p>
+    <ul style="font-size:x-small">
+      <li>supported flag: <ul>
+        <li>'yes' means this package is built by SUSE and supported by SUSE</li>
+        <li>'external' means this package is built by vendor and supported by both SUSE and vendor</li>
+        <li>'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag</li>
+      </ul>Please contact your IHV or who provide this package to you if it's highlighted, we don't recommend you install it. </li>
+      <li>symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it.</li>
+      <li>signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself.</li>
+      <li>vendor: SUSE partner who provides and supports the kernel module code and packaging.</li>
+    </ul>
+    <div></div>
+    <div>
+      <p style="text-align: center; font-size:large;background-color: #30BA78;">Summary of the result from vendor perspective: </p>
+    </div>
+    {{summary_table}}
+    <div>
+        <p style="text-align: center; font-size:large;background-color: #30BA78;">Check result in details: </p>
+      </div>
+      {{rpm_details}}
+    </body>
+    </html>
+

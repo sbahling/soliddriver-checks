@@ -54,7 +54,8 @@ setup(
         'paramiko',
         'pdfkit',
         'dominate',
-        'rich'
+        'rich',
+        'jinja2'
     ],
     entry_points={
         'console_scripts': [
