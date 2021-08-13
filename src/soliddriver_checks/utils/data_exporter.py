@@ -533,79 +533,8 @@ class RPMsExporter:
         rpm_table.to_json(file, orient="records")
 
     def _xlsx_create_overview(self, wb):
-        ws_ov = wb.active
-        ws_ov.title = "overview"
-
-        c_name = "A1"
-        ft_name = "Poppins Medium"
-        ws_ov[c_name] = "Solid driver check result(RPMs)"
-        ws_ov[c_name].alignment = Alignment(
-            horizontal="center", vertical="center", wrap_text=False
-        )
-        ws_ov[c_name].fill = PatternFill(
-            start_color="30BA78", end_color="30BA78", fill_type="solid"
-        )
-        ws_ov[c_name].font = Font(name=ft_name, size=18, bold=True)
-        ws_ov.merge_cells("A1:J1")
-
-        c_name = "A3"
-        ws_ov[
-            c_name
-        ] = "soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements."
-        ws_ov[c_name].font = Font(name=ft_name, size=11)
-        ws_ov[c_name].alignment = Alignment(wrap_text=True)
-        ws_ov.merge_cells("A3:J3")
-
-        c_name = "A5"
-        ws_ov[
-            c_name
-        ] = "Please refer to Kernel Module Packages Manual to learn how to build a KMP(Kernel Module Package)."
-        ws_ov[c_name].font = Font(name=ft_name, size=8)
-        ws_ov[c_name].alignment = Alignment(wrap_text=True)
-        ws_ov.merge_cells("A5:J5")
-
-        c_name = "A7"
-        ws_ov[c_name] = "What do we check?"
-        ws_ov[c_name].font = Font(name=ft_name, size=14)
-        ws_ov.merge_cells("A7:J7")
-
-        sd = Side(border_style="thin", color="30BA78")
-        bd = Border(top=sd, left=sd, right=sd, bottom=sd)
-        c_name = "A8"
-        ws_ov[
-            c_name
-        ] = "supported flag: 'yes' means this package is built by SUSE and supported by SUSE, 'external' means this package is built by vendor and supported by both SUSE and vendor, 'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag, please contact your IHV or who provide this package to you, we don't recommend you install it."
-        ws_ov[c_name].font = Font(name=ft_name, size=8)
-        ws_ov[c_name].alignment = Alignment(wrap_text=True)
-        ws_ov[c_name].border = bd
-        ws_ov.merge_cells("A8:J8")
-
-        c_name = "A9"
-        ws_ov[
-            c_name
-        ] = "symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it."
-        ws_ov[c_name].font = Font(name=ft_name, size=8)
-        ws_ov[c_name].alignment = Alignment(wrap_text=True)
-        ws_ov[c_name].border = bd
-        ws_ov.merge_cells("A9:J9")
-
-        c_name = "A10"
-        ws_ov[
-            c_name
-        ] = "signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself."
-        ws_ov[c_name].font = Font(name=ft_name, size=8)
-        ws_ov[c_name].alignment = Alignment(wrap_text=True)
-        ws_ov[c_name].border = bd
-        ws_ov.merge_cells("A10:J10")
-
-        c_name = "A11"
-        ws_ov[
-            c_name
-        ] = "vendor: SUSE partner who provides and supports the kernel module code and packaging."
-        ws_ov[c_name].font = Font(name=ft_name, size=8)
-        ws_ov[c_name].alignment = Alignment(wrap_text=True)
-        ws_ov[c_name].border = bd
-        ws_ov.merge_cells("A11:J11")
+        et = ExcelTemplate()
+        et.set_rpm_check_overview(wb.active)
 
     def _get_important_failed_style(self):
         ipt_font, ipt_border, ipt_fill = self._style.get_rpm_xslx_table_important_failed()
