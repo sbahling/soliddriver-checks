@@ -286,7 +286,9 @@ class RPMReader:
             if wm2_invoked:
                 self._progress.console.print("weak module    : %s" % str(wm2_invoked))
             else:
-                self._progress.console.print("[bold red]weak module    : %s[/]" % str(wm2_invoked))
+                self._progress.console.print(
+                    "[bold red]weak module    : %s[/]" % str(wm2_invoked)
+                )
             if (
                 "Missing" in supported
                 or "yes" in supported
@@ -411,7 +413,7 @@ class DriverReader:
             return True
         elif query == "vendor" and len(supported) == 1 and supported[0] == "external":
             return True
-        elif query == "unknow" and (len (supported) == 0 or len(supported) > 1):
+        elif query == "unknow" and (len(supported) == 0 or len(supported) > 1):
             return True
 
         return False
@@ -490,7 +492,7 @@ class DriverReader:
 
                 if values[0].strip() == "Signature":
                     key = ":".join(values[1:]).strip()
-                    key = key[key.index("Key ID")+7:].strip()
+                    key = key[key.index("Key ID") + 7 :].strip()
             sig_keys[rpm] = key
 
         return sig_keys
@@ -539,7 +541,7 @@ class DriverReader:
                 rpm_table[index]["os-release"],
                 rpm_table[index]["running"],
                 rpm.strip(),
-                ""
+                "",
             ]
             self._driver_df = self._driver_df.append(
                 pd.Series(row, index=self._columns), ignore_index=True
