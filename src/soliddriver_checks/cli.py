@@ -3,7 +3,6 @@ import json
 from .utils import remote_check
 from .utils import data_exporter
 from .utils import data_reader
-from .utils import terminal_visualizer
 import os
 import logging
 import socket
