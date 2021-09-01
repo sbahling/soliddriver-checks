@@ -258,6 +258,9 @@ class RPMsExporter:
             )
             no_sig = len(df_vendor.loc[df_vendor["signature"] != "", "signature"].index)
             wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
+            # if it's a debug rpm, it doesn't need to invoke wm module, so just add it to 
+            # the invoked list.
+            wm_invoked += len(df_vendor.loc[df["name"].str.contains("debuginfo"), "name"].index)
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
@@ -319,7 +322,7 @@ class RPMsExporter:
                         with td(s_external) as t:
                             if int(s_external.split(" ")[0]) != total_rpms:
                                 t.set_attribute(
-                                    "class", "critial_failed summary_number"
+                                    "class", "critical_failed summary_number"
                                 )
                             else:
                                 t.set_attribute("class", "summary_number")
@@ -462,7 +465,7 @@ class RPMsExporter:
                             tl = td(raw(lcs_chk), rowspan=no_err)
                             tl.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if wm_invoked:
+                        if wm_invoked or "debuginfo" in name:
                             td(str(wm_invoked), rowspan=no_err)
                         else:
                             tw = td(str(wm_invoked), rowspan=no_err)
@@ -512,7 +515,7 @@ class RPMsExporter:
                             tl = td(raw(lcs_chk))
                             tl.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if wm_invoked:
+                        if wm_invoked or "debuginfo" in name:
                             td(str(wm_invoked))
                         else:
                             tw = td(str(wm_invoked))
