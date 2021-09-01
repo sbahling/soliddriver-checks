@@ -9,6 +9,7 @@ from collections import namedtuple
 import tempfile
 from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 import numpy as np
+from .data_exporter import SDCConf, ValidLicense
 
 
 def get_cmd_all_drivers_modinfo():
@@ -220,6 +221,8 @@ class RPMReader:
         raw_output = str(raw_output, "utf-8").split("Name        :")
         rpms = raw_output[1:]
 
+        style = SDCConf()
+        vld_lic = style.get_valid_licenses()
         for i, rpm in enumerate(rpm_files):
             info = rpms[i].splitlines()
             name = info[0].strip()
@@ -229,7 +232,7 @@ class RPMReader:
             license = ""
             wm2_invoked = False
             for item in info:
-                if "/usr/lib/module-init-tools/weak-modules2" in item:
+                if "/usr/lib/module-init-tools/weak-modules2" in item or "debuginfo" in name:
                     wm2_invoked = True
 
                 values = item.split(":")
@@ -309,7 +312,7 @@ class RPMReader:
 
             license_check = True
             for k in d_licenses:
-                if d_licenses[k] != license:
+                if not ValidLicense(d_licenses[k], vld_lic):
                     license_check = False
                     break
 
