@@ -492,7 +492,9 @@ class DriverReader:
 
                 if values[0].strip() == "Signature":
                     key = ":".join(values[1:]).strip()
-                    key = key[key.index("Key ID") + 7 :].strip()
+                    idx = key.find("Key ID")
+                    if idx != -1:
+                        key = key[idx+7:].strip()
             sig_keys[rpm] = key
 
         return sig_keys
