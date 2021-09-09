@@ -392,7 +392,7 @@ class DriverReader:
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
             self._ssh.connect(
-                hostname=hostname, username=user, password=password, port=ssh_port
+                hostname=hostname, username=user, password=password, port=ssh_port, allow_agent=False, look_for_keys=False
             )
             return True
         except NoValidConnectionsError as e:
