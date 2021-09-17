@@ -280,7 +280,10 @@ class RPMReader:
             self._progress.console.print("name           : %s" % name)
             self._progress.console.print("path           : %s" % rpm)
             self._progress.console.print("vendor         : %s" % vendor)
-            self._progress.console.print("signature      : %s" % signature)
+            if signature == "" or signature == "none":
+                self._progress.console.print("[bold red]signature      : %s[/]" % signature)
+            else:
+                self._progress.console.print("signature      : %s" % signature)
             self._progress.console.print("disturibution  : %s" % distribution)
             self._progress.console.print("license        : %s" % license)
             if wm2_invoked:

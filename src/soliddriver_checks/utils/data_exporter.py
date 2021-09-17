@@ -256,7 +256,7 @@ class RPMsExporter:
             lic_check = license_check(
                 vld_lic, df_vendor["license"], df_vendor["dv-licenses"]
             )
-            no_sig = len(df_vendor.loc[df_vendor["signature"] != "", "signature"].index)
+            no_sig = len(df_vendor.loc[(df_vendor["signature"] != "") & (df_vendor["signature"] != "(none)"), "signature"].index)
             wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
             df_summary = df_summary.append(
                 {
@@ -319,7 +319,7 @@ class RPMsExporter:
                         with td(s_external) as t:
                             if int(s_external.split(" ")[0]) != total_rpms:
                                 t.set_attribute(
-                                    "class", "critial_failed summary_number"
+                                    "class", "critical_failed summary_number"
                                 )
                             else:
                                 t.set_attribute("class", "summary_number")
@@ -441,7 +441,7 @@ class RPMsExporter:
                         else:
                             tv = td("no vendor information", rowspan=no_err)
                             tv.set_attribute("class", "important_failed")
-                        if signature != "":
+                        if signature != "" and signature != "(none)":
                             td(signature, rowspan=no_err)
                         else:
                             ts = td(signature, rowspan=no_err)
@@ -491,7 +491,7 @@ class RPMsExporter:
                             tv = td("no vendor information")
                             tv.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if signature != "":
+                        if signature != "" and signature != "(none)":
                             td(signature)
                         else:
                             ts = td(signature)
@@ -792,7 +792,7 @@ class RPMsExporter:
         ws_rd.conditional_formatting.add(f"H2:H{records}", sf_rule)
 
         sig_rule = Rule(type="expression", dxf=ctc_style)
-        sig_rule.formula = ['=$D2 <> ""']
+        sig_rule.formula = ['=AND($D2 <> "", $D2 <> "(none)")']
         ws_rd.conditional_formatting.add(f"D2:D{records}", sig_rule)
 
         sym_rule = Rule(type="expression", dxf=ctc_style)
