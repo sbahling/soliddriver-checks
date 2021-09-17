@@ -10,6 +10,7 @@ import tempfile
 from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 import numpy as np
 
+from .data_exporter import ValidLicense, SDCConf
 
 def get_cmd_all_drivers_modinfo():
     return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$")'
@@ -219,6 +220,8 @@ class RPMReader:
     def _format_rpm_info(self, rpm_files, raw_output, row_handlers, query="all"):
         raw_output = str(raw_output, "utf-8").split("Name        :")
         rpms = raw_output[1:]
+        conf = SDCConf()
+        vld_lics = conf.get_valid_licenses()
 
         for i, rpm in enumerate(rpm_files):
             info = rpms[i].splitlines()
@@ -311,15 +314,18 @@ class RPMReader:
                 self._progress.console.print("symbols checks : success")
 
             license_check = True
-            for k in d_licenses:
-                if d_licenses[k] != license:
-                    license_check = False
-                    break
+            if not ValidLicense(license, vld_lics):
+                license_check = False
+            else:
+                for k in d_licenses:
+                    if not ValidLicense(d_licenses[k], vld_lics):
+                        license_check = False
+                        break
 
             if license_check:
-                self._progress.console.print("license check: success")
+                self._progress.console.print("license check : success")
             else:
-                self._progress.console.print("[bold red]license check: failed[/]")
+                self._progress.console.print("[bold red]license check : failed[/]")
 
             self._progress.advance(self._task)
 
