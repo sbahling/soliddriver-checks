@@ -295,24 +295,28 @@ class RPMReader:
                 self._progress.console.print(
                     "[bold red]weak module    : %s[/]" % str(wm2_invoked)
                 )
-            if (
-                "Missing" in supported
-                or "yes" in supported
-                or "no" in supported
-                or "Multiple" in supported
-            ):
+            supt_check = True
+            for k in supported:
+                if supported[k] != "external":
+                    supt_check = False
+                    break
+            if supt_check:
+                self._progress.console.print("supported flag : success")
+            else:
                 self._progress.console.print(
                     "[bold red]supported flag : failed \n%s[/]" % supported
                 )
+            sym_check = True
+            for k in symbols:
+                if len(symbols[k]) != 0:
+                    sym_check = False
+                    break
+            if sym_check:
+                self._progress.console.print("symbols checks : success")
             else:
-                self._progress.console.print("supported flag : success")
-            if ".ko" in symbols:
                 self._progress.console.print(
                     "[bold red]symbols checks : failed \n%s[/]" % symbols
                 )
-            else:
-                self._progress.console.print("symbols checks : success")
-
             license_check = True
             if not ValidLicense(license, vld_lics):
                 license_check = False
@@ -323,9 +327,9 @@ class RPMReader:
                         break
 
             if license_check:
-                self._progress.console.print("license check : success")
+                self._progress.console.print("license check  : success")
             else:
-                self._progress.console.print("[bold red]license check : failed[/]")
+                self._progress.console.print("[bold red]license check  : failed[/]")
 
             self._progress.advance(self._task)
 
