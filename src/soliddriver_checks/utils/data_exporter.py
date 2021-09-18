@@ -991,6 +991,7 @@ class DriversExporter:
             total_drivers, tp_drivers, failed_drivers = self._get_server_summary(dt)
             df = dt.copy()
             df = self._get_third_party_drivers(df)
+
             df.loc[df["running"] == "True", "running"] = "&#9989;"
             df.loc[df["running"] == "False", "running"] = "&#9940;"
             df = self._refmt_supported(df)
@@ -1025,12 +1026,12 @@ class DriversExporter:
         for i, row in df.iterrows():
             if (
                 "is not owned by any package" in row["rpm"]
-                or row["flag_supported"] != "external"
-                or row["signature"] == ""
-                or self._driver_path_check(row["path"]) is None
+                or " ".join(row["flag_supported"]) != "external"
+                or str(row["signature"]) != "True"
+                or not self._driver_path_check(row["path"])
+                or not ValidLicense(row["license"], vld_lic)
             ):
                 count += 1
-                continue
 
         return count
 
