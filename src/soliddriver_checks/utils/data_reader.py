@@ -21,23 +21,31 @@ def get_cmd_all_running_drivers_modinfo():
 
 
 def async_run_cmd(
-    cmd, line_handler, line_handler_arg, start, condition, sshClient=None
+    cmd, line_handler, line_handler_arg, start, end, condition, sshClient=None
 ):
     if sshClient is not None:
-        channel = sshClient.get_transport().open_session()
-        channel.exec_command(cmd)
+        stdin, stdout, stderr = sshClient.exec_command(cmd)
 
-        while not channel.exit_status_ready():
-            r, __, __ = select.select([channel], [], [])
-            if len(r) > 0:
-                recv = channel.recv(1024)
-                recv = str(recv, "utf-8").splitlines()
-                for line in recv:
-                    line_handler(line_handler_arg, line, start, condition)
-                    start += 1
+        lines = stdout.read().decode().splitlines()
+        for line in lines:
+            line_handler(line_handler_arg, line.strip(), start, condition)
+            start += 1
+            if start >= end:
+                break
 
-        channel.close()
-        # del stdin, stdout, stderr
+        # channel = sshClient.get_transport().open_session()
+        # channel.exec_command(cmd)
+
+        # while not channel.exit_status_ready():
+        #     r, __, __ = select.select([channel], [], [])
+        #     if len(r) > 0:
+        #         recv = channel.recv(1024)
+        #         recv = str(recv, "utf-8").splitlines()
+        #         for line in recv:
+        #             line_handler(line_handler_arg, line, start, condition)
+        #             start += 1
+
+        # channel.close()
     else:
         cmd_runner = subprocess.Popen(
             cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -46,6 +54,8 @@ def async_run_cmd(
             line = str(line, "utf-8")
             line_handler(line_handler_arg, line, start, condition)
             start += 1
+            if start >= end:
+                break
 
 
 def run_cmd(cmd, sshClient=None, timeout=None):
@@ -471,16 +481,9 @@ class DriverReader:
 
         return raw_output[1:]
 
-    def _get_driver_files(self, running_driver_info):
-        files = []
-        for driver in running_driver_info:
-            driver = driver.splitlines()
-            files.append(driver[0].strip())
-
-        return files
-
     def _get_rpm_sig_key(self, df_drivers, remote):
-        rpms = df_drivers.rpm.unique()
+        df = df_drivers.copy()
+        rpms = df.rpm.unique()
         rpms = [r for r in rpms if "not owned by any package" not in r]
 
         if len(rpms) < 1:
@@ -513,26 +516,26 @@ class DriverReader:
         return sig_keys
 
     def _fill_driver_rpm_info(
-        self, driver_files, item_handler, rpm_table, query, remote
+        self, d_files, item_handler, rpm_table, query, remote
     ):
         start = 0
-        step = 1000
+        # step = 1000
+        step = 1
         finished = False
-        total = len(driver_files)
+        total = len(d_files)
         while not finished:
-            if start + step >= total:
-                end = total - 1
+            end = start + step
+            if end > total:
+                end = total
                 finished = True
-            else:
-                end = start + step
 
-            cmd = "rpm -qf " + " ".join(driver_files[start:end])
+            cmd = "rpm -qf " + " ".join(d_files[start:end])
             if remote:
-                async_run_cmd(cmd, item_handler, rpm_table, start, query, self._ssh)
+                async_run_cmd(cmd, item_handler, rpm_table, start, end, query, self._ssh)
             else:
-                async_run_cmd(cmd, item_handler, rpm_table, start, query)
+                async_run_cmd(cmd, item_handler, rpm_table, start, end, query)
 
-            start = end + 1
+            start = end
 
         rpm_sig_keys = self._get_rpm_sig_key(self._driver_df, remote)
 
@@ -567,14 +570,36 @@ class DriverReader:
                     f"[light_steel_blue]Found driver: {rpm_table[index]['path']}[/light_steel_blue]"
                 )
 
+    def _org_driver_info(self, driver_files, running_drivers):
+        all_infos = driver_files
+        files = []
+        r_files = []
+        for d_info in driver_files:
+            fn = d_info.splitlines()[0].strip()
+            files.append(fn)
+
+        for r_info in running_drivers:
+            r_fn = r_info.splitlines()[0].strip()
+            r_files.append(r_fn)
+            found = False
+            for d_f in files:
+                if d_f == r_fn:
+                    found = True
+                    break
+            if not found:
+                all_infos.append(r_info)
+                files.append(r_fn)
+
+        return all_infos, files, r_files
+
     def _fill_driver_info(
         self, ip, drivers_modinfo, running_drivers_modinfo, query="all", remote=False
     ):
-        drivers_modinfo = set(self._modinfo_to_list(drivers_modinfo))
-        running_drivers_modinfo = set(self._modinfo_to_list(running_drivers_modinfo))
+        drivers_modinfo = self._modinfo_to_list(drivers_modinfo)
+        running_drivers_modinfo = self._modinfo_to_list(running_drivers_modinfo)
 
-        drivers_modinfo = drivers_modinfo.union(running_drivers_modinfo)
-        total_drivers = len(drivers_modinfo)
+        all_info, all_files, r_files = self._org_driver_info(drivers_modinfo, running_drivers_modinfo)
+        total_drivers = len(all_files)
         self._task = self._progress.add_task(
             "[italic][bold][green] Working on: "
             + ip
@@ -583,17 +608,14 @@ class DriverReader:
             total=total_drivers,
         )
 
-        driver_files = self._get_driver_files(drivers_modinfo)
-        running_driver_files = self._get_driver_files(running_drivers_modinfo)
-
         rpm_table = []
-        for driver in drivers_modinfo:
+        for driver in all_info:
             driver = driver.splitlines()
             filename = driver[0].strip()
             name = ""
             supported = []
             suserelease = "Missing"
-            running = str(filename in running_driver_files)
+            running = str(filename in r_files)
             license = ""
             signature = ""
 
@@ -632,7 +654,7 @@ class DriverReader:
 
         self._driver_df = pd.DataFrame(columns=self._columns)
         self._fill_driver_rpm_info(
-            driver_files, self._add_row_handler, rpm_table, query, remote
+            all_files, self._add_row_handler, rpm_table, query, remote
         )
 
         return self._driver_df
