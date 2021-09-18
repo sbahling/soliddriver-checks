@@ -256,7 +256,7 @@ class RPMsExporter:
             lic_check = license_check(
                 vld_lic, df_vendor["license"], df_vendor["dv-licenses"]
             )
-            no_sig = len(df_vendor.loc[df_vendor["signature"] != "", "signature"].index)
+            no_sig = len(df_vendor.loc[(df_vendor["signature"] != "") & (df_vendor["signature"] != "(none)"), "signature"].index)
             wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
             # if it's a debug rpm, it doesn't need to invoke wm module, so just add it to 
             # the invoked list.
@@ -444,7 +444,7 @@ class RPMsExporter:
                         else:
                             tv = td("no vendor information", rowspan=no_err)
                             tv.set_attribute("class", "important_failed")
-                        if signature != "":
+                        if signature != "" and signature != "(none)":
                             td(signature, rowspan=no_err)
                         else:
                             ts = td(signature, rowspan=no_err)
@@ -494,7 +494,7 @@ class RPMsExporter:
                             tv = td("no vendor information")
                             tv.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if signature != "":
+                        if signature != "" and signature != "(none)":
                             td(signature)
                         else:
                             ts = td(signature)
@@ -795,7 +795,7 @@ class RPMsExporter:
         ws_rd.conditional_formatting.add(f"H2:H{records}", sf_rule)
 
         sig_rule = Rule(type="expression", dxf=ctc_style)
-        sig_rule.formula = ['=$D2 <> ""']
+        sig_rule.formula = ['=AND($D2 <> "", $D2 <> "(none)")']
         ws_rd.conditional_formatting.add(f"D2:D{records}", sig_rule)
 
         sym_rule = Rule(type="expression", dxf=ctc_style)
@@ -994,6 +994,7 @@ class DriversExporter:
             total_drivers, tp_drivers, failed_drivers = self._get_server_summary(dt)
             df = dt.copy()
             df = self._get_third_party_drivers(df)
+
             df.loc[df["running"] == "True", "running"] = "&#9989;"
             df.loc[df["running"] == "False", "running"] = "&#9940;"
             df = self._refmt_supported(df)
@@ -1028,12 +1029,12 @@ class DriversExporter:
         for i, row in df.iterrows():
             if (
                 "is not owned by any package" in row["rpm"]
-                or row["flag_supported"] != "external"
-                or row["signature"] == ""
-                or self._driver_path_check(row["path"]) is None
+                or " ".join(row["flag_supported"]) != "external"
+                or str(row["signature"]) != "True"
+                or not self._driver_path_check(row["path"])
+                or not ValidLicense(row["license"], vld_lic)
             ):
                 count += 1
-                continue
 
         return count
 
