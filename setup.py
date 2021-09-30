@@ -27,7 +27,7 @@ setup(
     version=get_version("src/soliddriver_checks/version.py"),
     author="Hui-Zhi Zhao",
     author_email="hui.zhi.zhao@suse.com",
-    description=("Check RPM(s) and Drivers information"),
+    description=("Check RPMs and Drivers information"),
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/suse/soliddriver-checks",
@@ -43,7 +43,7 @@ setup(
     packages=find_packages(where="src"),
     include_package_data=True,
     # package_data={
-    #     '': ['*.conf']
+    #     '': ['*.conf', '*.sh']
     # },
     # data_files=[
     #     ('config', ['src/soliddriver_checks/config/soliddriver-checks.conf'])
@@ -55,7 +55,8 @@ setup(
         'pdfkit',
         'dominate',
         'rich',
-        'jinja2'
+        'jinja2',
+        'scp'
     ],
     entry_points={
         'console_scripts': [
