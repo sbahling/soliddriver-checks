@@ -30,7 +30,8 @@ def check_remote_servers(logger, servers):
                 check_result[server["ip"]] = tinfo
 
         for ip in check_result:
-            check_result[ip] = check_result[ip].result()
+            drivers, wu_drivers = check_result[ip].result()
+            check_result[ip] = {"drivers": drivers, "weak-update_drivers": wu_drivers}
         progress.console.print("[green]Check completed![/]")
 
     return check_result

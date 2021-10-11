@@ -7,6 +7,8 @@ import select
 import re
 from collections import namedtuple
 import tempfile
+import json
+from scp import SCPClient
 from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 import numpy as np
 from .data_exporter import SDCConf, ValidLicense
@@ -331,7 +333,6 @@ class RPMReader:
                     "[bold red]symbols checks : failed \n%s[/]" % symbols
                 )
             license_check = True
-<<<<<<< HEAD
             if not ValidLicense(license, vld_lics):
                 license_check = False
             else:
@@ -339,12 +340,6 @@ class RPMReader:
                     if not ValidLicense(d_licenses[k], vld_lics):
                         license_check = False
                         break
-=======
-            for k in d_licenses:
-                if not ValidLicense(d_licenses[k], vld_lic):
-                    license_check = False
-                    break
->>>>>>> upstream/main
 
             if license_check:
                 self._progress.console.print("license check  : success")
@@ -439,6 +434,24 @@ class DriverReader:
 
         return False
 
+    def _weak_update_driver_checks(self, remote=False):
+        pkg_path = os.path.dirname(__file__)
+        script = f"{pkg_path}/scripts/check-links.sh"
+        result = ""
+        if remote:
+            dist_path = "/tmp/check-links.sh"
+            with SCPClient(self._ssh.get_transport()) as scp:
+                scp.put(script, dist_path)
+            result = run_cmd(dist_path, self._ssh).decode()
+        else:
+            result = run_cmd(script)
+            result = str(result, "utf-8")
+
+        jstr = json.loads(result)
+        df = pd.json_normalize(jstr["weak-drivers"])
+
+        return df
+
     def _query_filter(self, supported, query="all"):
         if query == "all":
             return True
@@ -466,6 +479,8 @@ class DriverReader:
             driver_table = self._fill_driver_info(
                 ip, drivers_modinfo, running_drivers_modinfo, query, True
             )
+
+            wu_driver_table = self._weak_update_driver_checks(remote=True)
         except NoValidConnectionsError as e:
             self._progress.console.print(f"[bold red]Connect to {ip} failed : {e}[/]")
         finally:
@@ -473,7 +488,7 @@ class DriverReader:
 
         self._progress.update(self._task, visible=False)
 
-        return driver_table
+        return driver_table, wu_driver_table
 
     def get_local_drivers(self, query="all", row_handlers=[]):
         drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo())
@@ -482,8 +497,9 @@ class DriverReader:
         driver_table = self._fill_driver_info(
             "local host", drivers_modinfo, running_drivers_modinfo, query
         )
+        wu_driver_table = self._weak_update_driver_checks()
 
-        return driver_table
+        return driver_table, wu_driver_table
 
     def _modinfo_to_list(self, raw_output):
         raw_output = str(raw_output, "utf-8")
@@ -552,6 +568,8 @@ class DriverReader:
         for i, row in self._driver_df.iterrows():
             if "not owned by any package" not in row["rpm"]:
                 row["rpm_sig_key"] = rpm_sig_keys[row["rpm"]]
+            elif "/weak-updates/" in row["path"]:
+                row["rpm"] = "N/A"
 
     def _add_row_handler(self, rpm_table, rpm, index, query):
         if rpm == "":

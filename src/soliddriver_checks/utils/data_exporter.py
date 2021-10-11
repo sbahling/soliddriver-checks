@@ -854,6 +854,12 @@ class DriversExporter:
         self._style = SDCConf()
 
     def _driver_path_check(self, driver_path):
+        # if the driver is located in weak-updates directory,
+        # check wether it's valid or not first.
+        for i, wud_checks in self._wu_dt.iterrows():
+            if driver_path == wud_checks["driver"] and wud_checks["result"] == "Failed":
+                return None
+
         # TODO: this should be optimized!
         result = re.match(
             r"^/lib/modules/[0-9]+.[0-9]+.[0-9]+\-[0-9]+\-[a-z]+/(updates/|weak-updates/|extra/)",
@@ -949,10 +955,15 @@ class DriversExporter:
         jf = dict()
         for label, driver_table in driver_tables.items():
             if driver_table is not None:
-                buff = driver_table.to_json(orient="records")
+                drivers = driver_table["drivers"]
+                wu_drivers = driver_table["weak-update_drivers"]
+                drivers_buff = drivers.to_json(orient="records")
+                wu_drviers_buff = wu_drivers.to_json(orient="records")
             else:
-                buff = "{}"
-            jf[label] = json.loads(buff)
+                drivers_buff = "{}"
+                wu_drviers_buff = "{}"
+
+            jf[label] = {"drivers": json.loads(drivers_buff), "weak-update_drivers": json.loads(wu_drviers_buff)}
 
         with open(file, "w") as fp:
             json.dump(jf, fp)
@@ -986,11 +997,13 @@ class DriversExporter:
         driver_tmpl = env.get_template("driver-checks.html.jinja")
 
         details = []
-        for label, dt in driver_tables.items():
-            if dt is None:
+        for label, driver_table in driver_tables.items():
+            if driver_table is None:
                 details.append({"name": label, "table": "Connect error!"})
                 continue
 
+            dt = driver_table["drivers"]
+            self._wu_dt = driver_table["weak-update_drivers"]
             total_drivers, tp_drivers, failed_drivers = self._get_server_summary(dt)
             df = dt.copy()
             df = self._get_third_party_drivers(df)
@@ -1047,12 +1060,14 @@ class DriversExporter:
 
         return total_drivers, tpd_count, failed_count
 
-    def _xlsx_create_table(self, wb, label, driver_table):
+    def _xlsx_create_table(self, wb, label, driver_tables):
         ws_dc = wb.create_sheet(label)
-        if driver_table is None:
+        if driver_tables is None:
             return
 
-        df = self._get_third_party_drivers(driver_table)
+        dt = driver_tables["drivers"]
+        self._wu_dt = driver_tables["weak-update_drivers"]
+        df = self._get_third_party_drivers(dt)
         df = self._refmt_supported(df)
         for row in dataframe_to_rows(df, index=False, header=True):
             ws_dc.append(row)
