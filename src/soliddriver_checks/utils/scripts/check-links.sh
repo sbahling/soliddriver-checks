@@ -6,7 +6,7 @@ files=$(find /lib/modules/*/weak-updates/ -regex ".*\.\(ko\|ko.xz\)$")
 
 result="{\"weak-drivers\":["
 
-if [ files == "" ]
+if [[ ${files} == "" ]]
 then
   echo "${result}]}"
   exit
