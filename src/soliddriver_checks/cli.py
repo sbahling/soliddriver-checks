@@ -225,8 +225,8 @@ def run(check_target, output, out_format, query, version):
         )
         with progress:
             driverCheck = data_reader.DriverReader(progress)
-            drivers, wu_drivers = driverCheck.get_local_drivers(query)
-            check_result = {label: {"drivers": drivers, "weak-update_drivers": wu_drivers}}
+            drivers, wu_drivers, noinfo_drivers = driverCheck.get_local_drivers(query)
+            check_result = {label: {"drivers": drivers, "weak-update-drivers": wu_drivers, "noinfo-drivers": noinfo_drivers}}
         exporter = data_exporter.DriversExporter(logger)
         export(exporter, check_result, out_format, dst)
         progress.console.print(

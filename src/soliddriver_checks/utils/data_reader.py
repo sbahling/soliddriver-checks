@@ -13,14 +13,13 @@ from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 import numpy as np
 from .data_exporter import SDCConf, ValidLicense
 
-from .data_exporter import ValidLicense, SDCConf
 
 def get_cmd_all_drivers_modinfo():
-    return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$")'
+    return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$") 2>&1'
 
 
 def get_cmd_all_running_drivers_modinfo():
-    return "/usr/sbin/modinfo $(cat /proc/modules | awk '{print $1}')"
+    return "/usr/sbin/modinfo $(cat /proc/modules | awk '{print $1}') 2>&1"
 
 
 def async_run_cmd(
@@ -434,18 +433,33 @@ class DriverReader:
 
         return False
 
-    def _weak_update_driver_checks(self, remote=False):
-        pkg_path = os.path.dirname(__file__)
-        script = f"{pkg_path}/scripts/check-links.sh"
+    def _run_script(self, script_file, remote=False):
         result = ""
         if remote:
             dist_path = "/tmp/check-links.sh"
             with SCPClient(self._ssh.get_transport()) as scp:
-                scp.put(script, dist_path)
+                scp.put(script_file, dist_path)
             result = run_cmd(dist_path, self._ssh).decode()
         else:
-            result = run_cmd(script)
+            result = run_cmd(script_file)
             result = str(result, "utf-8")
+
+        return result
+
+    # def _srcversion_checks(self, remote=False):
+    #     pkg_path = os.path.dirname(__file__)
+    #     script = f"{pkg_path}/scripts/srcversion-check.sh"
+    #     result = self._run_script(script, remote)
+
+    #     jstr = json.loads(result)
+    #     df = pd.json_normalize(jstr["srcversions"])
+
+    #     return df
+
+    def _weak_update_driver_checks(self, remote=False):
+        pkg_path = os.path.dirname(__file__)
+        script = f"{pkg_path}/scripts/check-links.sh"
+        result = self._run_script(script, remote)
 
         jstr = json.loads(result)
         df = pd.json_normalize(jstr["weak-drivers"])
@@ -464,6 +478,15 @@ class DriverReader:
 
         return False
 
+    def _find_noinfo_drivers(self, running_drivers):
+        infos = str(running_drivers, "utf-8")
+        d_names = []
+        for line in infos.splitlines():
+            if line.startswith("modinfo: ERROR: "):
+                d_names.append(line.split(" ")[3])
+
+        return d_names
+
     def get_remote_drivers(
         self, ip="127.0.0.1", user="", password="", ssh_port=22, query="all"
     ):
@@ -476,11 +499,13 @@ class DriverReader:
                 get_cmd_all_running_drivers_modinfo(), self._ssh
             )
 
+            noinfo_drivers = self._find_noinfo_drivers(running_drivers_modinfo)
             driver_table = self._fill_driver_info(
                 ip, drivers_modinfo, running_drivers_modinfo, query, True
             )
 
             wu_driver_table = self._weak_update_driver_checks(remote=True)
+            # srcv_t = self._srcversion_checks(remote=True)
         except NoValidConnectionsError as e:
             self._progress.console.print(f"[bold red]Connect to {ip} failed : {e}[/]")
         finally:
@@ -488,7 +513,7 @@ class DriverReader:
 
         self._progress.update(self._task, visible=False)
 
-        return driver_table, wu_driver_table
+        return driver_table, wu_driver_table, noinfo_drivers
 
     def get_local_drivers(self, query="all", row_handlers=[]):
         drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo())
@@ -497,9 +522,12 @@ class DriverReader:
         driver_table = self._fill_driver_info(
             "local host", drivers_modinfo, running_drivers_modinfo, query
         )
-        wu_driver_table = self._weak_update_driver_checks()
+        noinfo_drivers = self._find_noinfo_drivers(running_drivers_modinfo)
 
-        return driver_table, wu_driver_table
+        wu_driver_table = self._weak_update_driver_checks()
+        # srcv_t = self._srcversion_checks()
+
+        return driver_table, wu_driver_table, noinfo_drivers
 
     def _modinfo_to_list(self, raw_output):
         raw_output = str(raw_output, "utf-8")

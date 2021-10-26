@@ -956,14 +956,15 @@ class DriversExporter:
         for label, driver_table in driver_tables.items():
             if driver_table is not None:
                 drivers = driver_table["drivers"]
-                wu_drivers = driver_table["weak-update_drivers"]
+                wu_drivers = driver_table["weak-update-drivers"]
                 drivers_buff = drivers.to_json(orient="records")
                 wu_drviers_buff = wu_drivers.to_json(orient="records")
+                noinfo_drivers = json.dumps(driver_table["noinfo-drivers"])
             else:
                 drivers_buff = "{}"
                 wu_drviers_buff = "{}"
 
-            jf[label] = {"drivers": json.loads(drivers_buff), "weak-update_drivers": json.loads(wu_drviers_buff)}
+            jf[label] = {"drivers": json.loads(drivers_buff), "weak-update-drivers": json.loads(wu_drviers_buff), "noinfo-drivers": json.loads(noinfo_drivers)}
 
         with open(file, "w") as fp:
             json.dump(jf, fp)
@@ -1003,10 +1004,32 @@ class DriversExporter:
                 continue
 
             dt = driver_table["drivers"]
-            self._wu_dt = driver_table["weak-update_drivers"]
+            self._wu_dt = driver_table["weak-update-drivers"]
             total_drivers, tp_drivers, failed_drivers = self._get_server_summary(dt)
             df = dt.copy()
             df = self._get_third_party_drivers(df)
+
+            # add no information drivers
+            noinfo_drivers = driver_table["noinfo-drivers"]
+            for driver in noinfo_drivers:
+                row = [
+                driver,
+                "Can not find file under /lib/modules",
+                "", "", "", "", "True",
+                f"driver {driver} is not owned by any package",
+                ]
+                df = df.append(
+                    pd.Series(row, index=[
+                                    "name",
+                                    "path",
+                                    "flag_supported",
+                                    "license",
+                                    "signature",
+                                    "os-release",
+                                    "running",
+                                    "rpm",
+                                    ]), ignore_index=True
+                    )
 
             df.loc[df["running"] == "True", "running"] = "&#9989;"
             df.loc[df["running"] == "False", "running"] = "&#9940;"
@@ -1066,7 +1089,7 @@ class DriversExporter:
             return
 
         dt = driver_tables["drivers"]
-        self._wu_dt = driver_tables["weak-update_drivers"]
+        self._wu_dt = driver_tables["weak-update-drivers"]
         df = self._get_third_party_drivers(dt)
         df = self._refmt_supported(df)
         for row in dataframe_to_rows(df, index=False, header=True):
