@@ -989,6 +989,29 @@ class DriversExporter:
 
         return df
 
+    def _append_noinfo_drivers(self, noinfo_drivers, drivers):
+        for driver in noinfo_drivers:
+                row = [
+                driver,
+                "Can not find file under /lib/modules",
+                "", "", "", "", "True",
+                f"driver {driver} is not owned by any package",
+                ]
+                drivers = drivers.append(
+                    pd.Series(row, index=[
+                                    "name",
+                                    "path",
+                                    "flag_supported",
+                                    "license",
+                                    "signature",
+                                    "os-release",
+                                    "running",
+                                    "rpm",
+                                    ]), ignore_index=True
+                    )
+
+        return drivers
+
     def to_html(self, driver_tables, file):
         pkg_path = os.path.dirname(__file__)
         jinja_tmpl = f"{pkg_path}/../config/templates"
@@ -1011,26 +1034,7 @@ class DriversExporter:
 
             # add no information drivers
             noinfo_drivers = driver_table["noinfo-drivers"]
-            for driver in noinfo_drivers:
-                row = [
-                driver,
-                "Can not find file under /lib/modules",
-                "", "", "", "", "True",
-                f"driver {driver} is not owned by any package",
-                ]
-                df = df.append(
-                    pd.Series(row, index=[
-                                    "name",
-                                    "path",
-                                    "flag_supported",
-                                    "license",
-                                    "signature",
-                                    "os-release",
-                                    "running",
-                                    "rpm",
-                                    ]), ignore_index=True
-                    )
-
+            df = self._append_noinfo_drivers(noinfo_drivers, df)
             df.loc[df["running"] == "True", "running"] = "&#9989;"
             df.loc[df["running"] == "False", "running"] = "&#9940;"
             df = self._refmt_supported(df)
@@ -1090,7 +1094,10 @@ class DriversExporter:
 
         dt = driver_tables["drivers"]
         self._wu_dt = driver_tables["weak-update-drivers"]
+        noinfo_drivers = driver_tables["noinfo-drivers"]
         df = self._get_third_party_drivers(dt)
+        noinfo_drivers = driver_tables["noinfo-drivers"]
+        df = self._append_noinfo_drivers(noinfo_drivers, df)
         df = self._refmt_supported(df)
         for row in dataframe_to_rows(df, index=False, header=True):
             ws_dc.append(row)
