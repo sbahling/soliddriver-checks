@@ -32,7 +32,8 @@ Usage: soliddriver-checks [OPTIONS] [CHECK_TARGET]
     rpm file
     directory containing rpm files
     "system" to check locally installed kernel modules
-    a config file listing remote systems to check
+    a config file listing remote systems to check (Please
+    ensure your remote systems are scp command accessable)
 
     default is local system
 
@@ -83,7 +84,7 @@ Options:
         "user": "username",
         "password": "password",
         "ssh_port": 22,
-        "query": "suse"
+        "query": "all"
       },
       {
 		"check": "True",

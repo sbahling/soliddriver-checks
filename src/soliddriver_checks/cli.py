@@ -152,7 +152,8 @@ def run(check_target, output, out_format, query, version):
       rpm file
       directory containing rpm files
       "system" to check locally installed kernel modules
-      a config file listing remote systems to check
+      a config file listing remote systems to check (Please
+      ensure your remote systems are scp command accessable)
 
       default is local system
     """
