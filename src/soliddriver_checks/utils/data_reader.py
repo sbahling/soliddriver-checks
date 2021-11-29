@@ -246,7 +246,10 @@ class RPMReader:
             license = ""
             wm2_invoked = False
             for item in info:
-                if "/usr/lib/module-init-tools/weak-modules2" in item or "debuginfo" in name:
+                if (
+                    "/usr/lib/module-init-tools/weak-modules2" in item
+                    or "debuginfo" in name
+                ):
                     wm2_invoked = True
 
                 values = item.split(":")
@@ -298,7 +301,9 @@ class RPMReader:
             self._progress.console.print("path           : %s" % rpm)
             self._progress.console.print("vendor         : %s" % vendor)
             if signature == "" or signature == "none":
-                self._progress.console.print("[bold red]signature      : %s[/]" % signature)
+                self._progress.console.print(
+                    "[bold red]signature      : %s[/]" % signature
+                )
             else:
                 self._progress.console.print("signature      : %s" % signature)
             self._progress.console.print("disturibution  : %s" % distribution)
@@ -393,8 +398,7 @@ class RPMReader:
         self._rpm_df = pd.DataFrame(columns=self._columns)
         rpm_infos = run_cmd("rpm -qpi --nosignature --scripts %s" % rpmfile)
         self._task = self._progress.add_task(
-            "[italic][bold][green] Checking RPMs "
-            + "; Total RPMs: 1 ",
+            "[italic][bold][green] Checking RPMs " + "; Total RPMs: 1 ",
             total=1,
         )
 
@@ -424,7 +428,12 @@ class DriverReader:
         self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
             self._ssh.connect(
-                hostname=hostname, username=user, password=password, port=ssh_port, allow_agent=False, look_for_keys=False
+                hostname=hostname,
+                username=user,
+                password=password,
+                port=ssh_port,
+                allow_agent=False,
+                look_for_keys=False,
             )
             return True
         except NoValidConnectionsError as e:
@@ -569,14 +578,12 @@ class DriverReader:
                     key = ":".join(values[1:]).strip()
                     idx = key.find("Key ID")
                     if idx != -1:
-                        key = key[idx+7:].strip()
+                        key = key[idx + 7 :].strip()
             sig_keys[rpm] = key
 
         return sig_keys
 
-    def _fill_driver_rpm_info(
-        self, d_files, item_handler, rpm_table, query, remote
-    ):
+    def _fill_driver_rpm_info(self, d_files, item_handler, rpm_table, query, remote):
         start = 0
         # step = 1000
         step = 1
@@ -590,7 +597,9 @@ class DriverReader:
 
             cmd = "rpm -qf " + " ".join(d_files[start:end])
             if remote:
-                async_run_cmd(cmd, item_handler, rpm_table, start, end, query, self._ssh)
+                async_run_cmd(
+                    cmd, item_handler, rpm_table, start, end, query, self._ssh
+                )
             else:
                 async_run_cmd(cmd, item_handler, rpm_table, start, end, query)
 
@@ -659,7 +668,9 @@ class DriverReader:
         drivers_modinfo = self._modinfo_to_list(drivers_modinfo)
         running_drivers_modinfo = self._modinfo_to_list(running_drivers_modinfo)
 
-        all_info, all_files, r_files = self._org_driver_info(drivers_modinfo, running_drivers_modinfo)
+        all_info, all_files, r_files = self._org_driver_info(
+            drivers_modinfo, running_drivers_modinfo
+        )
         total_drivers = len(all_files)
         self._task = self._progress.add_task(
             "[italic][bold][green] Working on: "

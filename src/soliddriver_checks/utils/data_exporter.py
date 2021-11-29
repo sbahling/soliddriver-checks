@@ -256,11 +256,19 @@ class RPMsExporter:
             lic_check = license_check(
                 vld_lic, df_vendor["license"], df_vendor["dv-licenses"]
             )
-            no_sig = len(df_vendor.loc[(df_vendor["signature"] != "") & (df_vendor["signature"] != "(none)"), "signature"].index)
+            no_sig = len(
+                df_vendor.loc[
+                    (df_vendor["signature"] != "")
+                    & (df_vendor["signature"] != "(none)"),
+                    "signature",
+                ].index
+            )
             wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
-            # if it's a debug rpm, it doesn't need to invoke wm module, so just add it to 
+            # if it's a debug rpm, it doesn't need to invoke wm module, so just add it to
             # the invoked list.
-            wm_invoked += len(df_vendor.loc[df["name"].str.contains("debuginfo"), "name"].index)
+            wm_invoked += len(
+                df_vendor.loc[df["name"].str.contains("debuginfo"), "name"].index
+            )
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
@@ -964,7 +972,11 @@ class DriversExporter:
                 drivers_buff = "{}"
                 wu_drviers_buff = "{}"
 
-            jf[label] = {"drivers": json.loads(drivers_buff), "weak-update-drivers": json.loads(wu_drviers_buff), "noinfo-drivers": json.loads(noinfo_drivers)}
+            jf[label] = {
+                "drivers": json.loads(drivers_buff),
+                "weak-update-drivers": json.loads(wu_drviers_buff),
+                "noinfo-drivers": json.loads(noinfo_drivers),
+            }
 
         with open(file, "w") as fp:
             json.dump(jf, fp)
@@ -991,24 +1003,32 @@ class DriversExporter:
 
     def _append_noinfo_drivers(self, noinfo_drivers, drivers):
         for driver in noinfo_drivers:
-                row = [
+            row = [
                 driver,
                 "Can not find file under /lib/modules",
-                "", "", "", "", "True",
+                "",
+                "",
+                "",
+                "",
+                "True",
                 f"driver {driver} is not owned by any package",
-                ]
-                drivers = drivers.append(
-                    pd.Series(row, index=[
-                                    "name",
-                                    "path",
-                                    "flag_supported",
-                                    "license",
-                                    "signature",
-                                    "os-release",
-                                    "running",
-                                    "rpm",
-                                    ]), ignore_index=True
-                    )
+            ]
+            drivers = drivers.append(
+                pd.Series(
+                    row,
+                    index=[
+                        "name",
+                        "path",
+                        "flag_supported",
+                        "license",
+                        "signature",
+                        "os-release",
+                        "running",
+                        "rpm",
+                    ],
+                ),
+                ignore_index=True,
+            )
 
         return drivers
 
