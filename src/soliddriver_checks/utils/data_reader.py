@@ -392,6 +392,11 @@ class RPMReader:
     def get_rpm_info(self, rpmfile):
         self._rpm_df = pd.DataFrame(columns=self._columns)
         rpm_infos = run_cmd("rpm -qpi --nosignature --scripts %s" % rpmfile)
+        self._task = self._progress.add_task(
+            "[italic][bold][green] Checking RPMs "
+            + "; Total RPMs: 1 ",
+            total=1,
+        )
 
         self._format_rpm_info([rpmfile.name], rpm_infos, [self._add_row])
 

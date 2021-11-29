@@ -185,9 +185,15 @@ def run(check_target, output, out_format, query, version):
         out_format = ext_to_format.get(dst.suffix, None)
 
     if target.rpm:
-        rpmCheck = data_reader.RPMReader()
-        check_result = rpmCheck.get_rpm_info(target.rpm)
-        print(check_result)
+        progress = Progress(
+            "{task.description}",
+            SpinnerColumn(),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        )
+        with progress:
+            rpmCheck = data_reader.RPMReader(progress)
+            check_result = rpmCheck.get_rpm_info(target.rpm)
 
     elif target.dir:
         progress = Progress(
