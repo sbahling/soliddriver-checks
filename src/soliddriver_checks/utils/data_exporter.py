@@ -150,8 +150,7 @@ class ExcelTemplate:
 
 
 class RPMsExporter:
-    def __init__(self, logger):
-        self._logger = logger
+    def __init__(self):
         self._style = SDCConf()
 
     def _summary_symbol_result(self, val):
@@ -857,8 +856,7 @@ class RPMsExporter:
 
 
 class DriversExporter:
-    def __init__(self, logger):
-        self._logger = logger
+    def __init__(self):
         self._style = SDCConf()
 
     def _driver_path_check(self, driver_path):

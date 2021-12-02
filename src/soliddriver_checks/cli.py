@@ -205,7 +205,7 @@ def run(check_target, output, out_format, query, version):
         with progress:
             rpmCheck = data_reader.RPMReader(progress)
             check_result = rpmCheck.get_rpms_info(path=target.dir, query=query)
-        exporter = data_exporter.RPMsExporter(logger)
+        exporter = data_exporter.RPMsExporter()
         export(exporter, check_result, out_format, dst)
         logger.info(
             "[green]Check is completed![/]"
@@ -240,7 +240,7 @@ def run(check_target, output, out_format, query, version):
                     "noinfo-drivers": noinfo_drivers,
                 }
             }
-        exporter = data_exporter.DriversExporter(logger)
+        exporter = data_exporter.DriversExporter()
         export(exporter, check_result, out_format, dst)
         progress.console.print(
             "[green]Check is completed![/]"
@@ -251,7 +251,7 @@ def run(check_target, output, out_format, query, version):
     elif target.config is not None:
         servers = target.config["servers"]
         check_result = remote_check.check_remote_servers(logger, servers)
-        exporter = data_exporter.DriversExporter(logger)
+        exporter = data_exporter.DriversExporter()
         export(exporter, check_result, out_format, dst)
         logger.info(
             "[green]Check is completed[/]"
