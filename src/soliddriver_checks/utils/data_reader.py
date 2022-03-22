@@ -90,6 +90,7 @@ class RPMReader:
             "df-supported",
             "sym-check",
             "dv-licenses",
+            "is-signed",
         ]
 
     def _driver_symbols_check(self, rpm_symbols, driver):
@@ -177,6 +178,13 @@ class RPMReader:
 
         return supported
 
+    def _fmt_driver_is_signed(self, drivers):
+        is_signed = dict()
+        for d in drivers:
+            is_signed[d] = drivers[d]["is_signed"]
+        
+        return is_signed
+
     def _fmt_driver_license(self, drivers):
         licenses = dict()
         for d in drivers:
@@ -196,6 +204,20 @@ class RPMReader:
                 symbols[d] = d_info
 
         return symbols
+
+    def _is_driver_signed(self, driver):
+        raw_info = run_cmd("/usr/sbin/modinfo %s" % driver)
+        raw_info = str(raw_info, "utf-8")
+        info_list = raw_info.splitlines()
+        for item in info_list:
+            values = item.split(":")
+            if len(values) < 2:
+                continue
+
+            if values[0].strip() == "signature":
+                return True
+
+        return False
 
     def _driver_checks(self, rpm: str):
         mod_reqs = self._get_rpm_symbols(rpm)
@@ -220,6 +242,7 @@ class RPMReader:
             item["symbols"] = self._driver_symbols_check(mod_reqs, driver)
             item["supported"] = self._get_driver_supported(driver)
             item["license"] = self._get_driver_license(driver)
+            item["is_signed"] = self._is_driver_signed(driver)
 
             dpath = str(driver)
             dpath = dpath[dpath.startswith(tmp.name) + len(tmp.name) - 1 :]
@@ -270,10 +293,12 @@ class RPMReader:
             supported = dict()
             symbols = dict()
             d_licenses = dict()
+            is_signed = dict()
             if driver_checks is not None:
                 supported = self._fmt_driver_supported(driver_checks)
                 symbols = self._fmt_driver_symbol(driver_checks)
                 d_licenses = self._fmt_driver_license(driver_checks)
+                is_signed = self._fmt_driver_is_signed(driver_checks)
 
             if not self._query_filter(supported, query):
                 continue
@@ -291,6 +316,7 @@ class RPMReader:
                         supported,
                         symbols,
                         d_licenses,
+                        is_signed
                     ]
                 )
 
@@ -300,7 +326,7 @@ class RPMReader:
             self._progress.console.print("name           : %s" % name)
             self._progress.console.print("path           : %s" % rpm)
             self._progress.console.print("vendor         : %s" % vendor)
-            if signature == "" or signature == "none":
+            if signature == "" or signature == "none" or signature == "(none)":
                 self._progress.console.print(
                     "[bold red]signature      : %s[/]" % signature
                 )

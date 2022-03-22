@@ -186,14 +186,27 @@ class RPMsExporter:
 
         return result
 
-    def _get_supported_driver_failed(self, supported):
+    def _get_supported_driver_failed(self, drivers):
         failed_drivers = []
-        for driver in supported:
-            if supported[driver] != "external":
-                d_name = Path(driver).name
-                failed_drivers.append(f"{d_name} : {supported[driver]}")
+        for d in drivers:
+            if drivers[d] != "external":
+                d_name = Path(d).name
+                errDetail = f"value is '{drivers[d]}'"
+                if drivers[d] == "Missing":
+                    errDetail = "no 'supported' flag found"
+                errMsg = f"'supported' flag check failed, {errDetail}"
+                failed_drivers.append(f"{d_name} : {errMsg}")
 
         return failed_drivers
+
+    def _get_no_signed_driver(self, drivers):
+        results = []
+        for d in drivers:
+            if not drivers[d]:
+                d_name = Path(d).name
+                results.append(f"{d_name} : no signature found")
+
+        return results
 
     def _get_summary_table(self, rpm_table):
         df = rpm_table.copy()
@@ -207,7 +220,7 @@ class RPMsExporter:
             columns=[
                 "Vendor",
                 "Total rpms",
-                "Supported:external",
+                "Driver Checks",
                 "License",
                 "Signature",
                 "Weak Module Invoked",
@@ -215,16 +228,23 @@ class RPMsExporter:
             ]
         )
 
-        def external_count(supported_flag):
+        def drivers_check(rpms_sf, rpms_is):
+            """
+            rpms_sf: RPMs' driver supported flag
+            rpm_is : RPMs' is_signed column
+            """
             num = 0
-            for sf in supported_flag:
-                misMatch = False
-                for driver in sf:
-                    if sf[driver] != "external":
-                        misMatch = True
+            # rpms_sf and rpms_is have the same drivers.
+            rpms = len(rpms_sf.index)
+            for i in range(rpms):
+                sf_drivers = rpms_sf.iat[i]
+                is_drivers = rpms_is.iat[i]
+                found_issues = False
+                for key in sf_drivers:
+                    if sf_drivers[key] != "external" or not is_drivers[key]:
+                        found_issues = True
                         break
-
-                if not misMatch:
+                if not found_issues:
                     num += 1
 
             return num
@@ -248,7 +268,7 @@ class RPMsExporter:
         for v in vendors:
             df_vendor = df.loc[df["vendor"] == v]
             total = len(df_vendor.index)
-            external = external_count(df_vendor["df-supported"])
+            dc = drivers_check(df_vendor["df-supported"], df_vendor["is-signed"])
             failed = len(
                 df_vendor.loc[df_vendor["sym-check"] == "failed", "sym-check"].index
             )
@@ -272,7 +292,7 @@ class RPMsExporter:
                 {
                     "Vendor": v,
                     "Total rpms": total,
-                    "Supported:external": f"{external} ({external/total * 100:.2f}%)",
+                    "Driver Checks": f"{dc} ({dc/total * 100:.2f}%)",
                     "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
                     "Weak Module Invoked": f"{wm_invoked} ({wm_invoked/total * 100:.2f}%)",
@@ -300,7 +320,7 @@ class RPMsExporter:
                 for i, row in df_summary.iterrows():
                     vendor = row["Vendor"]
                     total_rpms = row["Total rpms"]
-                    s_external = row["Supported:external"]
+                    dc = row["Driver Checks"]
                     lic_check = row["License"]
                     signature = row["Signature"]
                     wm_invoked = row["Weak Module Invoked"]
@@ -309,7 +329,7 @@ class RPMsExporter:
                     row_passed = False
                     if (
                         vendor != ""
-                        and int(s_external.split(" ")[0]) == total_rpms
+                        and int(dc.split(" ")[0]) == total_rpms
                         and int(lic_check.split(" ")[0]) == total_rpms
                         and int(signature.split(" ")[0]) == total_rpms
                         and int(wm_invoked.split(" ")[0]) == total_rpms
@@ -326,8 +346,8 @@ class RPMsExporter:
                             tv.set_attribute("class", "important_failed")
                         with td(total_rpms) as t:
                             t.set_attribute("class", "summary_total")
-                        with td(s_external) as t:
-                            if int(s_external.split(" ")[0]) != total_rpms:
+                        with td(dc) as t:
+                            if int(dc.split(" ")[0]) != total_rpms:
                                 t.set_attribute(
                                     "class", "critical_failed summary_number"
                                 )
@@ -372,12 +392,13 @@ class RPMsExporter:
                 "path": "Path",
                 "vendor": "Vendor",
                 "signature": "Signature",
-                "distribution": "Distribution",
+                # "distribution": "Distribution",
                 "license": "License",
                 "wm-invoked": "Weak Module Invoked",
-                "df-supported": "Driver Flag: Supported",
+                "df-supported": "Driver Checks",
                 "sym-check": "Symbols Check",
                 "dv-licenses": "Driver Licenses",
+                "is-signed": "is-signed",
             }
         )
 
@@ -417,7 +438,8 @@ class RPMsExporter:
             with tr():
                 cols = df.columns
                 for idx, col in enumerate(cols):
-                    if col != "Driver Licenses":  # Don't show this column
+                    # Don't show these columns
+                    if col != "Driver Licenses" and col != "is-signed" and col != "distribution":  
                         t = th(col)
                         t.set_attribute("class", f"detail_{idx}")
 
@@ -427,15 +449,17 @@ class RPMsExporter:
                     path = row["Path"]
                     vendor = row["Vendor"]
                     signature = row["Signature"]
-                    distribution = row["Distribution"]
+                    # distribution = row["Distribution"]
                     license = row["License"]
                     wm_invoked = row["Weak Module Invoked"]
                     sym_check = self._get_sym_check_failed(
                         row["Symbols Check"]
                     ).replace("\n", "</br>")
-                    supported = row["Driver Flag: Supported"]
-                    d_err = self._get_supported_driver_failed(supported)
-                    no_err = len(d_err)
+                    supported = row["Driver Checks"]
+                    is_signed = row["is-signed"]
+                    d_sf_err = self._get_supported_driver_failed(supported)
+                    d_sig_err = self._get_no_signed_driver(is_signed)
+                    no_err = len(d_sf_err) + len(d_sig_err)
                     dv_license = row["Driver Licenses"]
                     lcs_chk = self._fmt_driver_license_check(
                         license, dv_license, vld_lic
@@ -456,8 +480,8 @@ class RPMsExporter:
                         else:
                             ts = td(signature, rowspan=no_err)
                             ts.set_attribute("class", "important_failed")
-                        td(distribution, rowspan=no_err)
-                        if lcs_chk == "":
+                        # td(distribution, rowspan=no_err)
+                        if lcs_chk == "":  # license check
                             if license == "":
                                 tl = td("No License", rowspan=no_err)
                                 tl.set_attribute("class", "important_failed")
@@ -472,42 +496,49 @@ class RPMsExporter:
                             tl = td(raw(lcs_chk), rowspan=no_err)
                             tl.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if wm_invoked or "debuginfo" in name:
+                        if wm_invoked or "debuginfo" in name:  # wm check
                             td(str(wm_invoked), rowspan=no_err)
                         else:
                             tw = td(str(wm_invoked), rowspan=no_err)
                             tw.set_attribute("class", "critical_failed")
                             r.set_attribute("class", "critical_failed_row")
-                        t_w = td(d_err[0])
+                        t_w = td(d_sf_err[0])
                         t_w.set_attribute("class", "critical_failed")
-                        if sym_check == "":
+                        if sym_check == "":  # symbol check
                             t = td("All passed!", rowspan=no_err)
                             t.set_attribute("class", "detail_pass")
                         else:
                             t_w = td(raw(sym_check), rowspan=no_err)
                             t_w.set_attribute("class", "critical_failed")
                             r.set_attribute("class", "critical_failed_row")
-                        for val in d_err[1:]:
-                            with tr() as r:
-                                r.set_attribute("class", "critical_failed_row")
-                                t_w = td(val)
-                                t_w.set_attribute("class", "critical_failed")
+                        if len(d_sf_err) > 0:  # driver check
+                            for val in d_sf_err[1:]:
+                                with tr() as r:
+                                    r.set_attribute("class", "critical_failed_row")
+                                    t_w = td(val)
+                                    t_w.set_attribute("class", "critical_failed")
+                        if len(d_sig_err) > 0:
+                            for val in d_sig_err[1:]:
+                                with tr() as r:
+                                    r.set_attribute("class", "critical_failed_row")
+                                    t_w = td(val)
+                                    t_w.set_attribute("class", "critical_failed")
                     else:
                         td(name)
                         td(path)
-                        if vendor != "":
+                        if vendor != "":  # vendor check
                             td(vendor)
                         else:
                             tv = td("no vendor information")
                             tv.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if signature != "" and signature != "(none)":
+                        if signature != "" and signature != "(none)":  # signature check
                             td(signature)
                         else:
                             ts = td(signature)
                             ts.set_attribute("class", "important_failed")
-                        td(distribution)
-                        if lcs_chk == "":
+                        # td(distribution)
+                        if lcs_chk == "":  # license check
                             if license == "":
                                 tl = td("No License")
                                 tl.set_attribute("class", "important_failed")
@@ -522,19 +553,22 @@ class RPMsExporter:
                             tl = td(raw(lcs_chk))
                             tl.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if wm_invoked or "debuginfo" in name:
+                        if wm_invoked or "debuginfo" in name:  # wm check
                             td(str(wm_invoked))
                         else:
                             tw = td(str(wm_invoked))
                             tw.set_attribute("class", "critical_failed")
                             r.set_attribute("class", "critical_failed_row")
-                        if no_err > 0:
-                            t_w = td(d_err[0])
+                        if no_err > 0:  # driver check.
+                            if len(d_sf_err) > 0:
+                                t_w = td(d_sf_err[0])
+                            elif len(d_sig_err) > 0:
+                                t_w = td(d_sig_err[0])
                             t_w.set_attribute("class", "critical_failed")
                         else:
                             t = td("All passed!")
                             t.set_attribute("class", "detail_pass")
-                        if sym_check == "":
+                        if sym_check == "":  # symbol check.
                             t = td("All passed!")
                             t.set_attribute("class", "detail_pass")
                         else:
@@ -543,6 +577,12 @@ class RPMsExporter:
                             r.set_attribute("class", "critical_failed_row")
 
         return tb
+
+    def _fmt_driver_check_str(self, sffds, nsds):
+        sfds_l = self._get_supported_driver_failed(sffds)
+        nsds_l = self._get_no_signed_driver(nsds)
+
+        return sfds_l + nsds_l
 
     def to_html(self, rpm_table, file):
         pkg_path = os.path.dirname(__file__)
@@ -697,8 +737,9 @@ class RPMsExporter:
             header_fill,
         ) = self._style.get_rpm_xslx_table_header()
 
+        # Add headers
         cols = df.columns
-        xlsx_cols = list(string.ascii_lowercase[0 : len(cols)])
+        xlsx_cols = list(string.ascii_lowercase[0:len(cols)])
         for i in range(len(xlsx_cols)):
             cell_no = xlsx_cols[i] + "1"
             ws_rd[cell_no] = cols[i]
@@ -706,22 +747,17 @@ class RPMsExporter:
             ws_rd[cell_no].fill = header_fill
             ws_rd[cell_no].border = header_border
 
-        ws_rd.column_dimensions["J"].hidden = True
-
-        curr_row_no = 2
-        supported_col_no = 0
-
-        for i in range(len(cols)):
-            if cols[i] == "Driver Flag: Supported":
-                supported_col_no = i
-                break
+        # No need to show below volumns
+        ws_rd.column_dimensions["J"].hidden = True  # Driver Licenses
+        ws_rd.column_dimensions["E"].hidden = True  # Distribution
+        ws_rd.column_dimensions["K"].hidden = True  # is-signed
 
         vld_lic = self._style.get_valid_licenses()
 
         for i, row in df.iterrows():
             rpm_license = row["License"]
             for col_idx in range(len(cols)):
-                cell_no = xlsx_cols[col_idx] + str(curr_row_no)
+                cell_no = xlsx_cols[col_idx] + str(i+2)
                 val = row[cols[col_idx]]
 
                 ws_rd[cell_no].font = normal_font
@@ -737,9 +773,19 @@ class RPMsExporter:
                         ws_rd[cell_no].alignment = center_align
                     else:
                         ws_rd[cell_no] = val
-                elif cols[col_idx] == "Driver Flag: Supported":
-                    val = "All passed!"
-                    ws_rd[cell_no] = val
+                        ws_rd[cell_no].font = ctc_font
+                        ws_rd[cell_no].fill = ctc_fill
+                        ws_rd[cell_no].border = ctc_border
+                elif cols[col_idx] == "Driver Checks":
+                    val = self._fmt_driver_check_str(val, row["is-signed"])
+                    if len(val) > 0:
+                        ws_rd[cell_no] = '\n'.join(val)
+                        ws_rd[cell_no].font = ctc_font
+                        ws_rd[cell_no].fill = ctc_fill
+                        ws_rd[cell_no].border = ctc_border
+                    else:
+                        ws_rd[cell_no] = "All passed!"
+
                     ws_rd[cell_no].alignment = center_align
                 elif cols[col_idx] == "License":
                     lcs_chk = self._fmt_driver_license_check(
@@ -758,56 +804,20 @@ class RPMsExporter:
                         ws_rd[cell_no].font = imt_font
                         ws_rd[cell_no].fill = imt_fill
                         ws_rd[cell_no].border = imt_border
-                else:
+                else:  # no format needed.
                     ws_rd[cell_no] = str(val)
 
-            failed_drivers = self._get_supported_driver_failed(
-                row["Driver Flag: Supported"]
-            )
-            driver_count = len(failed_drivers)
-            if driver_count > 0:  # format supported information
-                for sp_idx in range(driver_count):
-                    cell_no = xlsx_cols[supported_col_no] + str(curr_row_no + sp_idx)
-                    ws_rd[cell_no] = failed_drivers[sp_idx]
-                    ws_rd[cell_no].font = ctc_font
-                    ws_rd[cell_no].fill = ctc_fill
-                    ws_rd[cell_no].border = ctc_border
-                    ws_rd[cell_no].alignment = normal_align
+        records = len(df) + 1
 
-            if driver_count > 1:  # need merge cell
-                for col_idx in range(len(cols)):
-                    if col_idx != supported_col_no:
-                        start_cell_no = xlsx_cols[col_idx] + str(curr_row_no)
-                        end_cell_no = xlsx_cols[col_idx] + str(
-                            curr_row_no + driver_count - 1
-                        )
-                        merge_range = start_cell_no + ":" + end_cell_no
-                        ws_rd.merge_cells(merge_range)
+        # vendor check format
+        epty_vendor = Rule(type="expression", dxf=imt_style)
+        epty_vendor.formula = ['$C2 = ""']
+        ws_rd.conditional_formatting.add(f"C2:C{records}", epty_vendor)
 
-            if driver_count == 0:
-                curr_row_no += 1
-            else:
-                curr_row_no += driver_count
-
-        records = curr_row_no
-
-        empty_vendor = Rule(type="expression", dxf=imt_style)
-        empty_vendor.formula = ['$C2 = ""']
-        ws_rd.conditional_formatting.add(f"C2:C{records}", empty_vendor)
-
-        sf_rule = Rule(type="expression", dxf=ctc_style)
-        sf_rule.formula = [
-            '=OR($H2="All passed!", AND(ISNUMBER(FIND(":", $H2)), ISNUMBER(FIND("external", $H2))))'
-        ]
-        ws_rd.conditional_formatting.add(f"H2:H{records}", sf_rule)
-
+        # signature check format
         sig_rule = Rule(type="expression", dxf=ctc_style)
-        sig_rule.formula = ['=AND($D2 <> "", $D2 <> "(none)")']
+        sig_rule.formula = ['=OR($D2 = "", $D2 = "(none)")']
         ws_rd.conditional_formatting.add(f"D2:D{records}", sig_rule)
-
-        sym_rule = Rule(type="expression", dxf=ctc_style)
-        sym_rule.formula = ['=ISNUMBER(FIND(".ko", $I2))']
-        ws_rd.conditional_formatting.add(f"I2:I{records}", sym_rule)
 
     def _xlsx_create_report_workbook(self):
         wb = Workbook()
