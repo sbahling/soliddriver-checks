@@ -283,11 +283,7 @@ class RPMsExporter:
                 ].index
             )
             wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
-            # if it's a debug rpm, it doesn't need to invoke wm module, so just add it to
-            # the invoked list.
-            wm_invoked += len(
-                df_vendor.loc[df["name"].str.contains("debuginfo"), "name"].index
-            )
+
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
@@ -436,12 +432,22 @@ class RPMsExporter:
         with tb:
             tb.set_attribute("class", "table_center")
             with tr():
-                cols = df.columns
-                for idx, col in enumerate(cols):
-                    # Don't show these columns
-                    if col != "Driver Licenses" and col != "is-signed" and col != "distribution":  
-                        t = th(col)
-                        t.set_attribute("class", f"detail_{idx}")
+                th("Name", rowspan=2).set_attribute("class", f"detail_0")
+                th("Path", rowspan=2).set_attribute("class", f"detail_1")
+                th("Vendor", rowspan=2).set_attribute("class", f"detail_2")
+                th("Signature", rowspan=2).set_attribute("class", f"detail_3")
+                th("License", rowspan=2).set_attribute("class", f"detail_4")
+                th("Weak Module Invoked", rowspan=2).set_attribute("class", f"detail_5")
+                th("Driver Checks", colspan=2).set_attribute("class", f"detail_6")
+            with tr():
+                th("Supported Flag/Signature").set_attribute("class", f"detail_6")
+                th("Symbols").set_attribute("class", f"detail_7")
+                # cols = df.columns
+                # for idx, col in enumerate(cols):
+                #     # Don't show these columns
+                #     if col != "Driver Licenses" and col != "is-signed" and col != "distribution":  
+                #         t = th(col)
+                #         t.set_attribute("class", f"detail_{idx}")
 
             for i, row in df.iterrows():
                 with tr() as r:
@@ -457,128 +463,66 @@ class RPMsExporter:
                     ).replace("\n", "</br>")
                     supported = row["Driver Checks"]
                     is_signed = row["is-signed"]
-                    d_sf_err = self._get_supported_driver_failed(supported)
-                    d_sig_err = self._get_no_signed_driver(is_signed)
-                    no_err = len(d_sf_err) + len(d_sig_err)
+                    dc_err = self._combine_driver_check_errs(supported, is_signed)
                     dv_license = row["Driver Licenses"]
                     lcs_chk = self._fmt_driver_license_check(
                         license, dv_license, vld_lic
                     )
                     lcs_chk.replace("\n", "</br>")
-                    if no_err > 0:
+                    if len(dc_err) > 0:
                         r.set_attribute("class", "critical_failed_row")
-                    if no_err > 1:
-                        td(name, rowspan=no_err)
-                        td(path, rowspan=no_err)
-                        if vendor != "":
-                            td(vendor, rowspan=no_err)
-                        else:
-                            tv = td("no vendor information", rowspan=no_err)
-                            tv.set_attribute("class", "important_failed")
-                        if signature != "" and signature != "(none)":
-                            td(signature, rowspan=no_err)
-                        else:
-                            ts = td(signature, rowspan=no_err)
-                            ts.set_attribute("class", "important_failed")
-                        # td(distribution, rowspan=no_err)
-                        if lcs_chk == "":  # license check
-                            if license == "":
-                                tl = td("No License", rowspan=no_err)
-                                tl.set_attribute("class", "important_failed")
-                                r.set_attribute("class", "important_failed_row")
-                            elif ValidLicense(license, vld_lic):
-                                td(license, rowspan=no_err)
-                            else:
-                                tl = td(license, rowspan=no_err)
-                                tl.set_attribute("class", "important_failed")
-                                r.set_attribute("class", "important_failed_row")
-                        else:
-                            tl = td(raw(lcs_chk), rowspan=no_err)
-                            tl.set_attribute("class", "important_failed")
-                            r.set_attribute("class", "important_failed_row")
-                        if wm_invoked or "debuginfo" in name:  # wm check
-                            td(str(wm_invoked), rowspan=no_err)
-                        else:
-                            tw = td(str(wm_invoked), rowspan=no_err)
-                            tw.set_attribute("class", "critical_failed")
-                            r.set_attribute("class", "critical_failed_row")
-                        t_w = td(d_sf_err[0])
-                        t_w.set_attribute("class", "critical_failed")
-                        if sym_check == "":  # symbol check
-                            t = td("All passed!", rowspan=no_err)
-                            t.set_attribute("class", "detail_pass")
-                        else:
-                            t_w = td(raw(sym_check), rowspan=no_err)
-                            t_w.set_attribute("class", "critical_failed")
-                            r.set_attribute("class", "critical_failed_row")
-                        if len(d_sf_err) > 0:  # driver check
-                            for val in d_sf_err[1:]:
-                                with tr() as r:
-                                    r.set_attribute("class", "critical_failed_row")
-                                    t_w = td(val)
-                                    t_w.set_attribute("class", "critical_failed")
-                        if len(d_sig_err) > 0:
-                            for val in d_sig_err[1:]:
-                                with tr() as r:
-                                    r.set_attribute("class", "critical_failed_row")
-                                    t_w = td(val)
-                                    t_w.set_attribute("class", "critical_failed")
+                    td(name)
+                    td(path)
+                    if vendor != "":  # vendor check
+                        td(vendor)
                     else:
-                        td(name)
-                        td(path)
-                        if vendor != "":  # vendor check
-                            td(vendor)
-                        else:
-                            tv = td("no vendor information")
-                            tv.set_attribute("class", "important_failed")
-                            r.set_attribute("class", "important_failed_row")
-                        if signature != "" and signature != "(none)":  # signature check
-                            td(signature)
-                        else:
-                            ts = td(signature)
-                            ts.set_attribute("class", "important_failed")
-                        # td(distribution)
-                        if lcs_chk == "":  # license check
-                            if license == "":
-                                tl = td("No License")
-                                tl.set_attribute("class", "important_failed")
-                                r.set_attribute("class", "important_failed_row")
-                            elif ValidLicense(license, vld_lic):
-                                td(license)
-                            else:
-                                tl = td(license)
-                                tl.set_attribute("class", "important_failed")
-                                r.set_attribute("class", "important_failed_row")
-                        else:
-                            tl = td(raw(lcs_chk))
+                        tv = td("no vendor information")
+                        tv.set_attribute("class", "important_failed")
+                        r.set_attribute("class", "important_failed_row")
+                    if signature != "" and signature != "(none)":  # signature check
+                        td(signature)
+                    else:
+                        ts = td(signature)
+                        ts.set_attribute("class", "important_failed")
+                    # td(distribution)
+                    if lcs_chk == "":  # license check
+                        if license == "":
+                            tl = td("No License")
                             tl.set_attribute("class", "important_failed")
                             r.set_attribute("class", "important_failed_row")
-                        if wm_invoked or "debuginfo" in name:  # wm check
-                            td(str(wm_invoked))
+                        elif ValidLicense(license, vld_lic):
+                            td(license)
                         else:
-                            tw = td(str(wm_invoked))
-                            tw.set_attribute("class", "critical_failed")
-                            r.set_attribute("class", "critical_failed_row")
-                        if no_err > 0:  # driver check.
-                            if len(d_sf_err) > 0:
-                                t_w = td(d_sf_err[0])
-                            elif len(d_sig_err) > 0:
-                                t_w = td(d_sig_err[0])
-                            t_w.set_attribute("class", "critical_failed")
-                        else:
-                            t = td("All passed!")
-                            t.set_attribute("class", "detail_pass")
-                        if sym_check == "":  # symbol check.
-                            t = td("All passed!")
-                            t.set_attribute("class", "detail_pass")
-                        else:
-                            t_w = td(raw(sym_check))
-                            t_w.set_attribute("class", "critical_failed")
-                            r.set_attribute("class", "critical_failed_row")
+                            tl = td(license)
+                            tl.set_attribute("class", "important_failed")
+                            r.set_attribute("class", "important_failed_row")
+                    else:
+                        tl = td(raw(lcs_chk))
+                        tl.set_attribute("class", "important_failed")
+                        r.set_attribute("class", "important_failed_row")
+                    if wm_invoked or "debuginfo" in name:  # wm check
+                        td(str(wm_invoked))
+                    else:
+                        tw = td(str(wm_invoked))
+                        tw.set_attribute("class", "critical_failed")
+                        r.set_attribute("class", "critical_failed_row")
+                    if len(dc_err) > 0:  # driver check.
+                        t_w = td(raw("</br>".join(dc_err)))
+                        t_w.set_attribute("class", "critical_failed")
+                    else:
+                        t = td("All passed!")
+                        t.set_attribute("class", "detail_pass")
+                    if sym_check == "":  # symbol check.
+                        t = td("All passed!")
+                        t.set_attribute("class", "detail_pass")
+                    else:
+                        t_w = td(raw(sym_check))
+                        t_w.set_attribute("class", "critical_failed")
+                        r.set_attribute("class", "critical_failed_row")
 
         return tb
 
-    def _fmt_driver_check_str(self, sffds, nsds):
+    def _combine_driver_check_errs(self, sffds, nsds):
         sfds_l = self._get_supported_driver_failed(sffds)
         nsds_l = self._get_no_signed_driver(nsds)
 
@@ -777,7 +721,7 @@ class RPMsExporter:
                         ws_rd[cell_no].fill = ctc_fill
                         ws_rd[cell_no].border = ctc_border
                 elif cols[col_idx] == "Driver Checks":
-                    val = self._fmt_driver_check_str(val, row["is-signed"])
+                    val = self._combine_driver_check_errs(val, row["is-signed"])
                     if len(val) > 0:
                         ws_rd[cell_no] = '\n'.join(val)
                         ws_rd[cell_no].font = ctc_font
