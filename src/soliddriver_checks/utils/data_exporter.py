@@ -1,10 +1,7 @@
-from numpy import c_
-from numpy.core.fromnumeric import shape
 import pdfkit
 import pandas as pd
 import os
 from pathlib import Path
-import dominate
 from dominate.tags import html, body, h1, div, tr, td, th, table, style, ul, li, p
 from dominate.util import raw
 from openpyxl.styles import (
@@ -21,10 +18,8 @@ from openpyxl import load_workbook
 from openpyxl.formatting.rule import Rule
 from openpyxl.utils.dataframe import dataframe_to_rows
 import json
-import ast
 import string
 from openpyxl import Workbook
-import time
 from jinja2 import Environment, FileSystemLoader
 import re
 from copy import copy
@@ -442,12 +437,6 @@ class RPMsExporter:
             with tr():
                 th("Supported Flag/Signature").set_attribute("class", f"detail_6")
                 th("Symbols").set_attribute("class", f"detail_7")
-                # cols = df.columns
-                # for idx, col in enumerate(cols):
-                #     # Don't show these columns
-                #     if col != "Driver Licenses" and col != "is-signed" and col != "distribution":  
-                #         t = th(col)
-                #         t.set_attribute("class", f"detail_{idx}")
 
             for i, row in df.iterrows():
                 with tr() as r:

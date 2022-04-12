@@ -8,9 +8,7 @@ import logging
 import socket
 from pathlib import Path
 from rich.logging import RichHandler
-from rich.live import Live
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from rich.style import Style
 from .version import __VERSION__
 
 

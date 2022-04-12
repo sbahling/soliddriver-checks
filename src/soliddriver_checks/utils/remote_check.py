@@ -1,7 +1,6 @@
 from .data_reader import DriverReader
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from paramiko.ssh_exception import NoValidConnectionsError
-from concurrent.futures import as_completed, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 
 def check_remote_servers(logger, servers):

@@ -3,14 +3,13 @@ from pathlib import Path
 import os
 import paramiko
 import pandas as pd
-import select
+# import select
 import re
 from collections import namedtuple
 import tempfile
 import json
 from scp import SCPClient
 from paramiko.ssh_exception import NoValidConnectionsError, SSHException
-import numpy as np
 from .data_exporter import SDCConf, ValidLicense
 
 
