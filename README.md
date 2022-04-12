@@ -19,7 +19,7 @@ A tool for ```RPM(s)``` and ```installed/running drivers``` checking, with this 
 
 From pypi: ```pip install soliddriver-checks```
 
-From RPM: the rpms can be found on [build.opensuse.org](https://build.opensuse.org/package/show/home:huizhizhao/soliddriver-checks)
+From RPM: the rpms can be found on [build.opensuse.org](https://build.opensuse.org/package/show/home:huizhizhao:soliddriver-checks/soliddriver-checks)
 
 ## Usage
 
