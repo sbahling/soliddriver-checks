@@ -427,14 +427,15 @@ class RPMsExporter:
         with tb:
             tb.set_attribute("class", "table_center")
             with tr():
-                th("Name", rowspan=2).set_attribute("class", f"detail_0")
-                th("Path", rowspan=2).set_attribute("class", f"detail_1")
-                th("Vendor", rowspan=2).set_attribute("class", f"detail_2")
-                th("Signature", rowspan=2).set_attribute("class", f"detail_3")
-                th("License", rowspan=2).set_attribute("class", f"detail_4")
-                th("Weak Module Invoked", rowspan=2).set_attribute("class", f"detail_5")
-                th("Driver Checks", colspan=2).set_attribute("class", f"detail_6")
+                th("RPM Checks", colspan=6).set_attribute("class", f"detail_rpm")
+                th("Kernel Module Checks", colspan=2).set_attribute("class", f"detail_kernel_module")
             with tr():
+                th("Name").set_attribute("class", f"detail_0")
+                th("Path").set_attribute("class", f"detail_1")
+                th("Vendor").set_attribute("class", f"detail_2")
+                th("Signature").set_attribute("class", f"detail_3")
+                th("License").set_attribute("class", f"detail_4")
+                th("Weak Module Invoked").set_attribute("class", f"detail_5")
                 th("Supported Flag/Signature").set_attribute("class", f"detail_6")
                 th("Symbols").set_attribute("class", f"detail_7")
 
