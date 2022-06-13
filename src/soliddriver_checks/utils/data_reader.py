@@ -14,7 +14,7 @@ from .data_exporter import SDCConf, ValidLicense
 
 
 def get_cmd_all_drivers_modinfo():
-    return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$") 2>&1'
+    return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\|ko.zst\)$") 2>&1'
 
 
 def get_cmd_all_running_drivers_modinfo():
