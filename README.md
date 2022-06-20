@@ -1,19 +1,25 @@
 # soliddriver-checks
 
-A tool for ```RPM(s)``` and ```installed/running drivers``` checking, with this tool, users can have an overview of their RPM(s) and drivers status:
+A tool for ```KMP(Kernel Module Package)``` and ```installed/running kernel module``` checking, with this tool, users can have an overview of their KMP(s) and kernel modules status:
 
+- KMP (Kernel Module Package)
+  - ```Name```: Name of the KMP </br>
+  - ```Path```: Path of the KMP’s location </br>
+  - ```Vendor```: Who provides this KMP, considered as important issue if there’s no vendor information. </br>
+  - ```Signature```: Signature of the KMP, considered as important issue if no signature. </br>
+  - ```License```: License followed by the KMP, considered as critical issue if it’s not open sourced license. </br>
+  - ```Weak Module Invoked```: The KMP should invoke weak-modules script to determines which modules are KAPI compatible with installed kernels and set up the symlinks. Otherwise it will be considered as critical issue. </br>
+- Kernel Module
+  - ```Supported Flag```/```Signature```: All the kernel module should have “supported” flag and assigned “external” value to it, otherwise it’s not be supported by SUSE. And all the kernel module should have signature.If the value of “supported” flag is not “external”, or no “supported” flag or no signature, will be considered as critical issue.  </br>
+    - The values of the flag respensent:
+      - ```yes```: This kernel module is supported by SUSE. But please confirm with SUSE if you're not sure if it's really supported by SUSE or the auther of the kernel module just put a ```yes``` on it.
+      - ```external```: This kernel module is supported by both vendor and SUSE.
+      - ```Missing or no```: The kernel module is not supported by SUSE, please contact the one who provide it to you for any issues. </br>
+  - ```Symbols```: All the symbols in kernel module should be recorded in KMP, otherwise considered as critical issue. </br>
 
-- RPM(s): checks ```vendor```, ```signature```, ```distribution``` and ```supported``` flag for drivers.
+## What you can do with this report generaged by soliddriver-checks?
 
-- Drivers: checks ```supported``` flag, ```SUSE release```, ```running``` and ```RPM name```.
-
-```vendor```: A RPM should have a vendor name. </br>
-```signature```: Confirm the signature is from the vendor above. </br>
-```distribution```: </br>
-```supported flag```: The values of the flag respensent:
-  - yes: This driver is supported by SUSE. But please confirm with SUSE if you're not sure if it's really supported by SUSE or the auther of the driver just put a ```yes``` on it.
-  - external: This driver is supported by both vendor and SUSE.
-  - Missing or no: The driver is not supported by SUSE, please contact the one who provide it to you for any issues.
+Regarding the issues listed in the table, please contact your IHV(s) to fix it and follow  [Kernel Module Packages Manual](https://drivers.suse.com/doc/kmpm/) to build SUSE standard KMP.
 
 ## Installation
 
