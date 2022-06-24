@@ -147,8 +147,8 @@ def run(check_target, output, out_format, query, version):
 
     \b
     CHECK_TARGET can be:
-      rpm file
-      directory containing rpm files
+      KMP file
+      directory containing KMP files
       "system" to check locally installed kernel modules
       a config file listing remote systems to check (Please
       ensure your remote systems are scp command accessable)
