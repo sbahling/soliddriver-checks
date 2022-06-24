@@ -214,7 +214,7 @@ class RPMsExporter:
         df_summary = pd.DataFrame(
             columns=[
                 "Vendor",
-                "Total rpms",
+                "Total RPMs",
                 "Driver Checks",
                 "License",
                 "Signature",
@@ -282,7 +282,7 @@ class RPMsExporter:
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
-                    "Total rpms": total,
+                    "Total RPMs": total,
                     "Driver Checks": f"{dc} ({dc/total * 100:.2f}%)",
                     "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
@@ -310,7 +310,7 @@ class RPMsExporter:
 
                 for i, row in df_summary.iterrows():
                     vendor = row["Vendor"]
-                    total_rpms = row["Total rpms"]
+                    total_rpms = row["Total RPMs"]
                     dc = row["Driver Checks"]
                     lic_check = row["License"]
                     signature = row["Signature"]
