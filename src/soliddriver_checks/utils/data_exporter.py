@@ -23,6 +23,15 @@ from openpyxl import Workbook
 from jinja2 import Environment, FileSystemLoader
 import re
 from copy import copy
+from datetime import datetime
+from ..version import __VERSION__
+
+
+def _get_version():
+    return f"version: {__VERSION__}"
+
+def _generate_timestamp():
+    return f"timestamp: {datetime.now()}"
 
 
 class SDCConf:
@@ -156,17 +165,21 @@ class RPMsExporter:
 
         result = ""
         if unfound_no > 0:
-            result = "Can not find symbols like {} ... in RPM! ".format(
-                val["unfound"][0]
-            )
+            # result = "Can not find symbols like {} ... in RPM! ".format(
+            #     val["unfound"][0]
+            # )
+            
+            result = f"Number of symbols can not be found in KMP: {unfound_no}"
 
         if cs_mm_no > 0:
-            result = (
-                result
-                + "Symbols check sum like {} ... does not match in RPM!".format(
-                    val["checksum-mismatch"][0]
-                )
-            )
+            # result = (
+            #     result
+            #     + "Symbols check sum like {} ... does not match in RPM!".format(
+            #         val["checksum-mismatch"][0]
+            #     )
+            # )
+            
+            result = result + f"  Number of symbols checksum does not match: {cs_mm_no}"
 
         return result
 
@@ -214,7 +227,7 @@ class RPMsExporter:
         df_summary = pd.DataFrame(
             columns=[
                 "Vendor",
-                "Total RPMs",
+                "Total KMPs",
                 "Driver Checks",
                 "License",
                 "Signature",
@@ -282,7 +295,7 @@ class RPMsExporter:
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
-                    "Total RPMs": total,
+                    "Total KMPs": total,
                     "Driver Checks": f"{dc} ({dc/total * 100:.2f}%)",
                     "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
@@ -310,7 +323,7 @@ class RPMsExporter:
 
                 for i, row in df_summary.iterrows():
                     vendor = row["Vendor"]
-                    total_rpms = row["Total RPMs"]
+                    total_rpms = row["Total KMPs"]
                     dc = row["Driver Checks"]
                     lic_check = row["License"]
                     signature = row["Signature"]
@@ -427,17 +440,17 @@ class RPMsExporter:
         with tb:
             tb.set_attribute("class", "table_center")
             with tr():
-                th("RPM Checks", colspan=6).set_attribute("class", f"detail_rpm")
+                th("KMP Checks", colspan=6).set_attribute("class", f"detail_rpm")
                 th("Kernel Module Checks", colspan=2).set_attribute("class", f"detail_kernel_module")
             with tr():
                 th("Name").set_attribute("class", f"detail_0")
                 th("Path").set_attribute("class", f"detail_1")
                 th("Vendor").set_attribute("class", f"detail_2")
-                th("Signature").set_attribute("class", f"detail_3")
-                th("License").set_attribute("class", f"detail_4")
-                th("Weak Module Invoked").set_attribute("class", f"detail_5")
-                th("Supported Flag/Signature").set_attribute("class", f"detail_6")
-                th("Symbols").set_attribute("class", f"detail_7")
+                th(raw("Signature<span class=\"tooltiptext\">Only check there's a signature or not.</span>")).set_attribute("class", f"detail_3 tooltip")
+                th(raw("License<span class=\"tooltiptext\">KMP and it's kernel modules should use open source licenses.</span>")).set_attribute("class", f"detail_4 tooltip")
+                th(raw("Weak Module Invoked<span class=\"tooltiptext\">Weak Module is necessary to make 3rd party kernel modules installed for one kernel available to KABI-compatible kernels. </span>")).set_attribute("class", f"detail_5 tooltip")
+                th(raw("Supported Flag/Signature<span class=\"tooltiptext\">\"supported\" flag: <br/>  \"yes\": Only supported by SUSE<br/>  \"external\": supported by both SUSE and vendor</span>")).set_attribute("class", f"detail_6 tooltip")
+                th(raw("Symbols<span class=\"tooltiptext\">symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
 
             for i, row in df.iterrows():
                 with tr() as r:
@@ -524,9 +537,9 @@ class RPMsExporter:
         file_loader = FileSystemLoader(jinja_tmpl)
         env = Environment(loader=file_loader)
 
-        rpm_tmpl = env.get_template("rpm-checks.html.jinja")
+        rpm_tmpl = env.get_template("kmp-checks.html.jinja")
 
-        rpm_checks = rpm_tmpl.render(
+        rpm_checks = rpm_tmpl.render(version=_get_version(), timestamp=_generate_timestamp(),
             summary_table=self._get_summary_table_html(rpm_table),
             rpm_details=self._get_table_detail_html(rpm_table),
         )
