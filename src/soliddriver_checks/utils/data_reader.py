@@ -579,9 +579,12 @@ class DriverReader:
         rpms = df.rpm.unique()
 
         rpms = [r for r in rpms if "not owned by any package" not in r]
+        rpms = [r for r in rpms if "is not installed" not in r]
+
+        sig_keys = dict()
 
         if len(rpms) < 1:
-            return dict()
+            return sig_keys
 
         rpmInfo = ""
         if remote:
@@ -591,7 +594,6 @@ class DriverReader:
 
         rpmInfo = str(rpmInfo, "utf-8").split("Name        :")
         rpmInfo = rpmInfo[1:]  # Skip "Name      :"
-        sig_keys = dict()
         for i, rpm in enumerate(rpms):
             info = rpmInfo[i].splitlines()
             key = ""
@@ -605,7 +607,7 @@ class DriverReader:
                     idx = key.find("Key ID")
                     if idx != -1:
                         key = key[idx + 7 :].strip()
-            sig_keys[rpm] = key
+            sig_keys[rpm] = key # give an empty value if there's no signature is found.
 
         return sig_keys
 
