@@ -133,10 +133,10 @@ class ExcelTemplate:
         self._cfg_path = f"{pkg_path}/../config/templates/templates.xlsx"
 
     def set_driver_check_overview(self, ws):
-        self._copy_work_sheep("driver-check-summary", ws)
+        self._copy_work_sheep("km-report-overview", ws)
 
     def set_rpm_check_overview(self, ws):
-        self._copy_work_sheep("rpm-check-summary", ws)
+        self._copy_work_sheep("kmp-report-overview", ws)
 
     def _copy_work_sheep(self, title, ws):
         tmpl = load_workbook(filename=self._cfg_path)
@@ -152,6 +152,8 @@ class ExcelTemplate:
                 ws[cell.coordinate].fill = copy(cell.fill)
                 ws[cell.coordinate].alignment = copy(cell.alignment)
 
+        ws["A5"].value = _get_version()
+        ws["A6"].value = _generate_timestamp()
 
 class RPMsExporter:
     def __init__(self):
@@ -658,7 +660,7 @@ class RPMsExporter:
 
     def _xlsx_create_rpm_details(self, wb, rpm_table):
         df = self._rename_rpm_detail_columns(rpm_table)
-        ws_rd = wb.create_sheet("RPMs details")
+        ws_rd = wb.create_sheet("KMPs details")
         (
             normal_font,
             normal_border,
@@ -685,15 +687,30 @@ class RPMsExporter:
         ) = self._style.get_rpm_xslx_table_header()
 
         # Add headers
+        ws_rd.merge_cells('A1:G1')
+        ws_rd['A1'] = "KMP Checks"
+        ws_rd['A1'].font = header_font
+        ws_rd['A1'].fill = header_fill
+        ws_rd['A1'].border = header_border
+        ws_rd['A1'].alignment = center_align
+        
+        ws_rd.merge_cells('H1:I1')
+        ws_rd['H1'] = "Kernel Module Checks"
+        ws_rd['H1'].font = header_font
+        ws_rd['H1'].fill = header_fill
+        ws_rd['H1'].border = header_border
+        ws_rd['H1'].alignment = center_align
+        
         cols = df.columns
         xlsx_cols = list(string.ascii_lowercase[0:len(cols)])
         for i in range(len(xlsx_cols)):
-            cell_no = xlsx_cols[i] + "1"
+            cell_no = xlsx_cols[i] + "2"
             ws_rd[cell_no] = cols[i]
             ws_rd[cell_no].font = header_font
             ws_rd[cell_no].fill = header_fill
             ws_rd[cell_no].border = header_border
 
+        ws_rd["H2"] = "Supported Flag/Signature"  # rename the column name
         # No need to show below volumns
         ws_rd.column_dimensions["J"].hidden = True  # Driver Licenses
         ws_rd.column_dimensions["E"].hidden = True  # Distribution
@@ -704,7 +721,7 @@ class RPMsExporter:
         for i, row in df.iterrows():
             rpm_license = row["License"]
             for col_idx in range(len(cols)):
-                cell_no = xlsx_cols[col_idx] + str(i+2)
+                cell_no = xlsx_cols[col_idx] + str(i+3)
                 val = row[cols[col_idx]]
 
                 ws_rd[cell_no].font = normal_font
@@ -784,15 +801,15 @@ class RPMsExporter:
         wb.save(file)
 
     def to_pdf(self, rpm_table, file):
-        self.to_html(rpm_table, ".tmp.rpms.html")
-        pdfkit.from_file(".tmp.rpms.html", file)
-        os.remove(".tmp.rpms.html")
+        self.to_html(rpm_table, ".tmp.kmps.html")
+        pdfkit.from_file(".tmp.kmps.html", file)
+        os.remove(".tmp.kmps.html")
 
     def to_all(self, rpm_table, directory):
-        excel_file = os.path.join(directory, "check_result.xlsx")
-        html_file = os.path.join(directory, "check_result.html")
-        pdf_file = os.path.join(directory, "check_result.pdf")
-        json_file = os.path.join(directory, "check_result.json")
+        excel_file = os.path.join(directory, "check_report.xlsx")
+        html_file = os.path.join(directory, "check_report.html")
+        pdf_file = os.path.join(directory, "check_report.pdf")
+        json_file = os.path.join(directory, "check_report.json")
 
         if not os.path.exists(directory):
             os.mkdir(directory)
