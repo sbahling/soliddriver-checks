@@ -577,6 +577,7 @@ class DriverReader:
     def _get_rpm_sig_key(self, df_drivers, remote):
         df = df_drivers.copy()
         rpms = df.rpm.unique()
+
         rpms = [r for r in rpms if "not owned by any package" not in r]
 
         if len(rpms) < 1:
@@ -656,8 +657,8 @@ class DriverReader:
                 rpm.strip(),
                 "",
             ]
-            self._driver_df = self._driver_df.concat(
-                pd.Series(row, index=self._columns), ignore_index=True
+            self._driver_df = pd.concat([self._driver_df, 
+                pd.Series(row, index=self._columns)], ignore_index=True
             )
 
             if self._ssh is None:
