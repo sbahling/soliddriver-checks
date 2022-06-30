@@ -656,7 +656,7 @@ class DriverReader:
                 rpm.strip(),
                 "",
             ]
-            self._driver_df = self._driver_df.append(
+            self._driver_df = self._driver_df.concat(
                 pd.Series(row, index=self._columns), ignore_index=True
             )
 

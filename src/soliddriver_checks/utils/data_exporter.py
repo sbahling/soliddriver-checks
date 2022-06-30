@@ -1,3 +1,4 @@
+from sqlite3 import Timestamp
 import pdfkit
 import pandas as pd
 import os
@@ -1031,7 +1032,7 @@ class DriversExporter:
             df.loc[df["running"] == "False", "running"] = "&#9940;"
             df = self._refmt_supported(df)
             ts = (
-                df.style.hide_index()
+                df.style.hide(axis='index')
                 .set_table_attributes('class="table_center"')
                 .apply(self._format_row_html, axis=1)
             )
@@ -1042,11 +1043,11 @@ class DriversExporter:
                     "total_drivers": total_drivers,
                     "third_party_drivers": tp_drivers,
                     "failed_drivers": failed_drivers,
-                    "table": ts.render(),
+                    "table": ts.to_html(),
                 }
             )
 
-        driver_checks = driver_tmpl.render(details=details)
+        driver_checks = driver_tmpl.render(version=_get_version(), timestamp=_generate_timestamp(), details=details)
 
         with open(file, "w") as f:
             f.write(driver_checks)
