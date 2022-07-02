@@ -576,10 +576,10 @@ class DriverReader:
 
     def _get_rpm_sig_key(self, df_drivers, remote):
         df = df_drivers.copy()
+        df['rpm'] = df['rpm'].fillna("")
         rpms = df.rpm.unique()
 
-        rpms = [r for r in rpms if "not owned by any package" not in r]
-        rpms = [r for r in rpms if "is not installed" not in r]
+        rpms = [r for r in rpms if "not owned by any package" not in r and "" != r and "is not installed" not in r]
 
         sig_keys = dict()
 
