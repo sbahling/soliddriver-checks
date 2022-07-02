@@ -1,3 +1,4 @@
+from sqlite3 import Timestamp
 import pdfkit
 import pandas as pd
 import os
@@ -23,6 +24,15 @@ from openpyxl import Workbook
 from jinja2 import Environment, FileSystemLoader
 import re
 from copy import copy
+from datetime import datetime
+from ..version import __VERSION__
+
+
+def _get_version():
+    return f"version: {__VERSION__}"
+
+def _generate_timestamp():
+    return f"timestamp: {datetime.now()}"
 
 
 class SDCConf:
@@ -124,10 +134,10 @@ class ExcelTemplate:
         self._cfg_path = f"{pkg_path}/../config/templates/templates.xlsx"
 
     def set_driver_check_overview(self, ws):
-        self._copy_work_sheep("driver-check-summary", ws)
+        self._copy_work_sheep("km-report-overview", ws)
 
     def set_rpm_check_overview(self, ws):
-        self._copy_work_sheep("rpm-check-summary", ws)
+        self._copy_work_sheep("kmp-report-overview", ws)
 
     def _copy_work_sheep(self, title, ws):
         tmpl = load_workbook(filename=self._cfg_path)
@@ -143,6 +153,8 @@ class ExcelTemplate:
                 ws[cell.coordinate].fill = copy(cell.fill)
                 ws[cell.coordinate].alignment = copy(cell.alignment)
 
+        ws["A5"].value = _get_version()
+        ws["A6"].value = _generate_timestamp()
 
 class RPMsExporter:
     def __init__(self):
@@ -156,17 +168,21 @@ class RPMsExporter:
 
         result = ""
         if unfound_no > 0:
-            result = "Can not find symbols like {} ... in RPM! ".format(
-                val["unfound"][0]
-            )
+            # result = "Can not find symbols like {} ... in RPM! ".format(
+            #     val["unfound"][0]
+            # )
+            
+            result = f"Number of symbols can not be found in KMP: {unfound_no}"
 
         if cs_mm_no > 0:
-            result = (
-                result
-                + "Symbols check sum like {} ... does not match in RPM!".format(
-                    val["checksum-mismatch"][0]
-                )
-            )
+            # result = (
+            #     result
+            #     + "Symbols check sum like {} ... does not match in RPM!".format(
+            #         val["checksum-mismatch"][0]
+            #     )
+            # )
+            
+            result = result + f"  Number of symbols checksum does not match: {cs_mm_no}"
 
         return result
 
@@ -214,7 +230,7 @@ class RPMsExporter:
         df_summary = pd.DataFrame(
             columns=[
                 "Vendor",
-                "Total rpms",
+                "Total KMPs",
                 "Driver Checks",
                 "License",
                 "Signature",
@@ -282,7 +298,7 @@ class RPMsExporter:
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
-                    "Total rpms": total,
+                    "Total KMPs": total,
                     "Driver Checks": f"{dc} ({dc/total * 100:.2f}%)",
                     "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
@@ -310,7 +326,7 @@ class RPMsExporter:
 
                 for i, row in df_summary.iterrows():
                     vendor = row["Vendor"]
-                    total_rpms = row["Total rpms"]
+                    total_rpms = row["Total KMPs"]
                     dc = row["Driver Checks"]
                     lic_check = row["License"]
                     signature = row["Signature"]
@@ -427,16 +443,17 @@ class RPMsExporter:
         with tb:
             tb.set_attribute("class", "table_center")
             with tr():
-                th("Name", rowspan=2).set_attribute("class", f"detail_0")
-                th("Path", rowspan=2).set_attribute("class", f"detail_1")
-                th("Vendor", rowspan=2).set_attribute("class", f"detail_2")
-                th("Signature", rowspan=2).set_attribute("class", f"detail_3")
-                th("License", rowspan=2).set_attribute("class", f"detail_4")
-                th("Weak Module Invoked", rowspan=2).set_attribute("class", f"detail_5")
-                th("Driver Checks", colspan=2).set_attribute("class", f"detail_6")
+                th("KMP Checks", colspan=6).set_attribute("class", f"detail_rpm")
+                th("Kernel Module Checks", colspan=2).set_attribute("class", f"detail_kernel_module")
             with tr():
-                th("Supported Flag/Signature").set_attribute("class", f"detail_6")
-                th("Symbols").set_attribute("class", f"detail_7")
+                th("Name").set_attribute("class", f"detail_0")
+                th("Path").set_attribute("class", f"detail_1")
+                th("Vendor").set_attribute("class", f"detail_2")
+                th(raw("Signature<span class=\"tooltiptext\">Only check there's a signature or not.</span>")).set_attribute("class", f"detail_3 tooltip")
+                th(raw("License<span class=\"tooltiptext\">KMP and it's kernel modules should use open source licenses.</span>")).set_attribute("class", f"detail_4 tooltip")
+                th(raw("Weak Module Invoked<span class=\"tooltiptext\">Weak Module is necessary to make 3rd party kernel modules installed for one kernel available to KABI-compatible kernels. </span>")).set_attribute("class", f"detail_5 tooltip")
+                th(raw("Supported Flag/Signature<span class=\"tooltiptext\">\"supported\" flag: <br/>  \"yes\": Only supported by SUSE<br/>  \"external\": supported by both SUSE and vendor</span>")).set_attribute("class", f"detail_6 tooltip")
+                th(raw("Symbols<span class=\"tooltiptext\">symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
 
             for i, row in df.iterrows():
                 with tr() as r:
@@ -523,9 +540,9 @@ class RPMsExporter:
         file_loader = FileSystemLoader(jinja_tmpl)
         env = Environment(loader=file_loader)
 
-        rpm_tmpl = env.get_template("rpm-checks.html.jinja")
+        rpm_tmpl = env.get_template("kmp-checks.html.jinja")
 
-        rpm_checks = rpm_tmpl.render(
+        rpm_checks = rpm_tmpl.render(version=_get_version(), timestamp=_generate_timestamp(),
             summary_table=self._get_summary_table_html(rpm_table),
             rpm_details=self._get_table_detail_html(rpm_table),
         )
@@ -644,7 +661,7 @@ class RPMsExporter:
 
     def _xlsx_create_rpm_details(self, wb, rpm_table):
         df = self._rename_rpm_detail_columns(rpm_table)
-        ws_rd = wb.create_sheet("RPMs details")
+        ws_rd = wb.create_sheet("KMPs details")
         (
             normal_font,
             normal_border,
@@ -671,15 +688,30 @@ class RPMsExporter:
         ) = self._style.get_rpm_xslx_table_header()
 
         # Add headers
+        ws_rd.merge_cells('A1:G1')
+        ws_rd['A1'] = "KMP Checks"
+        ws_rd['A1'].font = header_font
+        ws_rd['A1'].fill = header_fill
+        ws_rd['A1'].border = header_border
+        ws_rd['A1'].alignment = center_align
+        
+        ws_rd.merge_cells('H1:I1')
+        ws_rd['H1'] = "Kernel Module Checks"
+        ws_rd['H1'].font = header_font
+        ws_rd['H1'].fill = header_fill
+        ws_rd['H1'].border = header_border
+        ws_rd['H1'].alignment = center_align
+        
         cols = df.columns
         xlsx_cols = list(string.ascii_lowercase[0:len(cols)])
         for i in range(len(xlsx_cols)):
-            cell_no = xlsx_cols[i] + "1"
+            cell_no = xlsx_cols[i] + "2"
             ws_rd[cell_no] = cols[i]
             ws_rd[cell_no].font = header_font
             ws_rd[cell_no].fill = header_fill
             ws_rd[cell_no].border = header_border
 
+        ws_rd["H2"] = "Supported Flag/Signature"  # rename the column name
         # No need to show below volumns
         ws_rd.column_dimensions["J"].hidden = True  # Driver Licenses
         ws_rd.column_dimensions["E"].hidden = True  # Distribution
@@ -690,7 +722,7 @@ class RPMsExporter:
         for i, row in df.iterrows():
             rpm_license = row["License"]
             for col_idx in range(len(cols)):
-                cell_no = xlsx_cols[col_idx] + str(i+2)
+                cell_no = xlsx_cols[col_idx] + str(i+3)
                 val = row[cols[col_idx]]
 
                 ws_rd[cell_no].font = normal_font
@@ -770,15 +802,15 @@ class RPMsExporter:
         wb.save(file)
 
     def to_pdf(self, rpm_table, file):
-        self.to_html(rpm_table, ".tmp.rpms.html")
-        pdfkit.from_file(".tmp.rpms.html", file)
-        os.remove(".tmp.rpms.html")
+        self.to_html(rpm_table, ".tmp.kmps.html")
+        pdfkit.from_file(".tmp.kmps.html", file)
+        os.remove(".tmp.kmps.html")
 
     def to_all(self, rpm_table, directory):
-        excel_file = os.path.join(directory, "check_result.xlsx")
-        html_file = os.path.join(directory, "check_result.html")
-        pdf_file = os.path.join(directory, "check_result.pdf")
-        json_file = os.path.join(directory, "check_result.json")
+        excel_file = os.path.join(directory, "check_report.xlsx")
+        html_file = os.path.join(directory, "check_report.html")
+        pdf_file = os.path.join(directory, "check_report.pdf")
+        json_file = os.path.join(directory, "check_report.json")
 
         if not os.path.exists(directory):
             os.mkdir(directory)
@@ -1000,6 +1032,7 @@ class DriversExporter:
             df.loc[df["running"] == "False", "running"] = "&#9940;"
             df = self._refmt_supported(df)
             ts = (
+                # df.style.hide(axis='index')
                 df.style.hide_index()
                 .set_table_attributes('class="table_center"')
                 .apply(self._format_row_html, axis=1)
@@ -1015,7 +1048,7 @@ class DriversExporter:
                 }
             )
 
-        driver_checks = driver_tmpl.render(details=details)
+        driver_checks = driver_tmpl.render(version=_get_version(), timestamp=_generate_timestamp(), details=details)
 
         with open(file, "w") as f:
             f.write(driver_checks)

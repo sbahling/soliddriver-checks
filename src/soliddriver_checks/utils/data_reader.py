@@ -14,7 +14,7 @@ from .data_exporter import SDCConf, ValidLicense
 
 
 def get_cmd_all_drivers_modinfo():
-    return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\)$") 2>&1'
+    return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\|ko.zst\)$") 2>&1'
 
 
 def get_cmd_all_running_drivers_modinfo():
@@ -577,10 +577,13 @@ class DriverReader:
     def _get_rpm_sig_key(self, df_drivers, remote):
         df = df_drivers.copy()
         rpms = df.rpm.unique()
-        rpms = [r for r in rpms if "not owned by any package" not in r]
+
+        rpms = [r for r in rpms if "not owned by any package" not in r and "" != r and "is not installed" not in r]
+
+        sig_keys = dict()
 
         if len(rpms) < 1:
-            return dict()
+            return sig_keys
 
         rpmInfo = ""
         if remote:
@@ -590,7 +593,6 @@ class DriverReader:
 
         rpmInfo = str(rpmInfo, "utf-8").split("Name        :")
         rpmInfo = rpmInfo[1:]  # Skip "Name      :"
-        sig_keys = dict()
         for i, rpm in enumerate(rpms):
             info = rpmInfo[i].splitlines()
             key = ""
@@ -604,7 +606,7 @@ class DriverReader:
                     idx = key.find("Key ID")
                     if idx != -1:
                         key = key[idx + 7 :].strip()
-            sig_keys[rpm] = key
+            sig_keys[rpm] = key # give an empty value if there's no signature is found.
 
         return sig_keys
 
@@ -645,19 +647,27 @@ class DriverReader:
         supported = rpm_table[index]["flag_supported"]
         self._progress.advance(self._task)
         if self._query_filter(supported, query):
-            row = [
-                rpm_table[index]["name"],
-                rpm_table[index]["path"],
-                supported,
-                rpm_table[index]["license"],
-                rpm_table[index]["signature"],
-                rpm_table[index]["os-release"],
-                rpm_table[index]["running"],
-                rpm.strip(),
-                "",
-            ]
-            self._driver_df = self._driver_df.append(
-                pd.Series(row, index=self._columns), ignore_index=True
+            # row = [
+            #     rpm_table[index]["name"],
+            #     rpm_table[index]["path"],
+            #     supported,
+            #     rpm_table[index]["license"],
+            #     rpm_table[index]["signature"],
+            #     rpm_table[index]["os-release"],
+            #     rpm_table[index]["running"],
+            #     rpm.strip(),
+            #     "",
+            # ]
+            row = pd.DataFrame({'name':[rpm_table[index]["name"]],
+                                "path": [rpm_table[index]["path"]],
+                                "flag_supported": [supported],
+                                "license": [rpm_table[index]["license"]],
+                                "signature": [rpm_table[index]["signature"]],
+                                "os-release": [rpm_table[index]["os-release"]],
+                                "running": [rpm_table[index]["running"]],
+                                "rpm": [rpm.strip()],
+                                "rpm_sig_key": [""]})
+            self._driver_df = pd.concat([self._driver_df, row], ignore_index=True
             )
 
             if self._ssh is None:

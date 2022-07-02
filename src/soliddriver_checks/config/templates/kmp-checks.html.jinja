@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>checking result from soliddriver-checks</title>
+    <title>Kernel Module Packages Check Report</title>
     <style>body {
             font-family: 'Poppins';
             font-size: 18px;
@@ -26,6 +26,13 @@
          th.summary_vendor{
             width:240px;
          }
+        th.detail_rpm{
+          width:auto;
+        }
+        th.detail_kernel_module{
+          width:auto;
+          background-color:#90EBCD;
+        }
         th.detail_0{
              width:120px;
          }
@@ -46,6 +53,10 @@
          }
          th.detail_6{
            width:240px;
+          background-color:#90EBCD;
+         }th.detail_7{
+           width:240px;
+          background-color:#90EBCD;
          }
          td{
             text-align:left;
@@ -94,26 +105,51 @@
          td.warning_row_border{
             border: 2px solid #FE7C3F
          }
+
+         .tooltip {
+            position: relative;
+          }
+  
+         .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 180px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+          }
+          
+          .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #555 transparent transparent transparent;
+          }
+  
+          .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+          }
     </style>
   </head>
   <body>
-    <div><div>
-      <h1 style="text-align: center; font-size:x-large;background-color: #30BA78;">Solid driver check result (RPMs)</h1>
+   <div><div style="background-color:#30BA78">
+      <h3 style="text-align: center; font-size:x-large;">Kernel Module Packages Check Report</h3>
     </div>
-    <p style="font-size:small;">soliddriver-checks is a tool for parnter(s) and customer(s) to check their RPMs to ensure these are meet basic SUSE requirements.</p>
-    <p style="font-size:x-small">Please refer to <a href="https://drivers.suse.com/doc/kmpm/" style="background-color: #30BA78;">Kernel Module Packages Manual</a> to learn how to build a KMP(Kernel Module Package).</p>
-    <p>What do we check?</p>
-    <ul style="font-size:x-small">
-      <li>supported flag: <ul>
-        <li>'yes' means this package is built by SUSE and supported by SUSE</li>
-        <li>'external' means this package is built by vendor and supported by both SUSE and vendor</li>
-        <li>'Missing' or others means this package does not contain 'supported' flag or unrecognizable 'supported' flag</li>
-      </ul>Please contact your IHV or who provide this package to you if it's highlighted, we don't recommend you install it. </li>
-      <li>symbol check: For all KMP packages, the symbols needed by the drivers in this packages, should also have the requires in RPM and the checksum should match. Otherwise we don't recommend you install it.</li>
-      <li>signature: We list it here but not check if it's from the vendor in the list, please veirfy it by youself.</li>
-      <li>vendor: SUSE partner who provides and supports the kernel module code and packaging.</li>
-    </ul>
-    <div></div>
+    <p style="font-size:small;"><strong>soliddriver-checks</strong> is a tool for parnter and customer to check their <strong>KMPs(Kernel Module Packages)</strong> or <strong>installed/running kernel modules</strong> whether can meet basic SUSE requirements. More information can be found <a href="https://github.com/SUSE/soliddriver-checks" style="background-color: #30BA78;">here</a></p>
+    <p style="font-size:small;text-align:center">{{version}}  {{timestamp}}</p>
     <div>
       <p style="text-align: center; font-size:large;background-color: #30BA78;">Summary of the result from vendor perspective: </p>
     </div>
