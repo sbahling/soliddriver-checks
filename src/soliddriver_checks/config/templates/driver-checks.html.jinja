@@ -70,10 +70,8 @@
       <h3 style="text-align: center; font-size:x-large;">Kernel Modules Check Report</h3>
     </div>
     <p style="font-size:small;"><strong>soliddriver-checks</strong> is a tool for parnter and customer to check their <strong>KMPs(Kernel Module Packages)</strong> or <strong>installed/running kernel modules</strong> whether can meet basic SUSE requirements. More information can be found <a href="https://github.com/SUSE/soliddriver-checks" style="background-color: #30BA78;">here</a></p>
+    <p style="font-size:small;"><strong style="background-color:yellow; color:red;">Notice: </strong> Only kernel modules provided by third parties can be list in this report, for full report please use json output.</p>
     <p style="font-size:small;text-align:center">{{version}}  {{timestamp}}</p>
-    <div>
-      <p style="text-align: center; font-size:large;background-color: #30BA78;">Summary of the result from vendor perspective: </p>
-    </div>
     {% for detail in details -%}
       <div>
         <p style="text-align: center; font-size:large;background-color: #30BA78;">soliddriver check report: {{detail.name}}</p>

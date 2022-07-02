@@ -576,7 +576,6 @@ class DriverReader:
 
     def _get_rpm_sig_key(self, df_drivers, remote):
         df = df_drivers.copy()
-        df['rpm'] = df['rpm'].fillna("")
         rpms = df.rpm.unique()
 
         rpms = [r for r in rpms if "not owned by any package" not in r and "" != r and "is not installed" not in r]
@@ -648,19 +647,27 @@ class DriverReader:
         supported = rpm_table[index]["flag_supported"]
         self._progress.advance(self._task)
         if self._query_filter(supported, query):
-            row = [
-                rpm_table[index]["name"],
-                rpm_table[index]["path"],
-                supported,
-                rpm_table[index]["license"],
-                rpm_table[index]["signature"],
-                rpm_table[index]["os-release"],
-                rpm_table[index]["running"],
-                rpm.strip(),
-                "",
-            ]
-            self._driver_df = pd.concat([self._driver_df, 
-                pd.Series(row, index=self._columns)], ignore_index=True
+            # row = [
+            #     rpm_table[index]["name"],
+            #     rpm_table[index]["path"],
+            #     supported,
+            #     rpm_table[index]["license"],
+            #     rpm_table[index]["signature"],
+            #     rpm_table[index]["os-release"],
+            #     rpm_table[index]["running"],
+            #     rpm.strip(),
+            #     "",
+            # ]
+            row = pd.DataFrame({'name':[rpm_table[index]["name"]],
+                                "path": [rpm_table[index]["path"]],
+                                "flag_supported": [supported],
+                                "license": [rpm_table[index]["license"]],
+                                "signature": [rpm_table[index]["signature"]],
+                                "os-release": [rpm_table[index]["os-release"]],
+                                "running": [rpm_table[index]["running"]],
+                                "rpm": [rpm.strip()],
+                                "rpm_sig_key": [""]})
+            self._driver_df = pd.concat([self._driver_df, row], ignore_index=True
             )
 
             if self._ssh is None:
