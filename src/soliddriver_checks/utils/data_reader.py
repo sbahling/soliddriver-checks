@@ -147,7 +147,8 @@ class RPMReader:
 
             if values[0].strip() == "supported":
                 if supported != "":  # only allow appears once.
-                    return "Multiple"
+                    supported = supported + ", " + ":".join(values[1:]).strip()
+                    # return "Multiple"
                 else:
                     supported = ":".join(values[1:]).strip()
 
