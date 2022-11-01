@@ -411,7 +411,7 @@ class RPMsExporter:
                 "signature": "Signature",
                 "license": "License",
                 "wm-invoked": "Weak Module Invoked",
-                "df-supported": "Driver Checks",
+                "df-supported": "Supported Flag Check",
                 "sym-check": "Symbols Check",
                 "modalias": "Modalias Check",
                 "dv-licenses": "Driver Licenses",
@@ -445,6 +445,26 @@ class RPMsExporter:
                 )
 
         return chk_result
+    
+    def _fmt_modalias_check(self, alias):
+        km_unmatched = len(alias["unmatched_km_alias"])
+        kmp_unmatched = len(alias["unmatched_kmp_alias"])
+        
+        message = ""
+        
+        if km_unmatched > 0:
+            message += "Alias found in kernel module but no match in it's package: "
+            for kmu in alias["unmatched_km_alias"]:
+                message += kmu + ", "
+            message += "\n"
+        
+        if kmp_unmatched > 0:
+            message += "Alias found in the package but no match in it's kernel module: "
+            for kmpu in alias["unmatched_kmp_alias"]:
+                message += kmpu + ", "
+        
+        return message
+        
 
     def _get_table_detail_html(self, rpm_table):
         df = self._rename_rpm_detail_columns(rpm_table)
@@ -478,9 +498,11 @@ class RPMsExporter:
                     sym_check = self._get_sym_check_failed(
                         row["Symbols Check"]
                     ).replace("\n", "</br>")
-                    supported = row["Driver Checks"]
+                    supported = row["Supported Flag Check"]
                     is_signed = row["is-signed"]
-                    dc_err = self._combine_driver_check_errs(supported, is_signed)
+                    alias = row["Modalias Check"]
+                    alias_chk = self._fmt_modalias_check(alias)
+                    dc_err = self._supported_sig_errs(supported, is_signed)
                     dv_license = row["Driver Licenses"]
                     lcs_chk = self._fmt_driver_license_check(
                         license, dv_license, vld_lic
@@ -501,7 +523,6 @@ class RPMsExporter:
                     else:
                         ts = td(signature)
                         ts.set_attribute("class", "important_failed")
-                    # td(distribution)
                     if lcs_chk == "":  # license check
                         if license == "":
                             tl = td("No License")
@@ -536,10 +557,17 @@ class RPMsExporter:
                         t_w = td(raw(sym_check))
                         t_w.set_attribute("class", "critical_failed")
                         r.set_attribute("class", "critical_failed_row")
+                    if alias_chk == "":
+                        t = td("All passed!")
+                        t.set_attribute("class", "detail_pass")
+                    else:
+                        t_w = td(raw(alias_chk.replace("\n", "</br>")))
+                        t_w.set_attribute("class", "important_failed")
+                        r.set_attribute("class", "important_failed_row")
 
         return tb
 
-    def _combine_driver_check_errs(self, sffds, nsds):
+    def _supported_sig_errs(self, sffds, nsds):
         sfds_l = self._get_supported_driver_failed(sffds)
         nsds_l = self._get_no_signed_driver(nsds)
 
@@ -752,8 +780,8 @@ class RPMsExporter:
                         ws_rd[cell_no].font = ctc_font
                         ws_rd[cell_no].fill = ctc_fill
                         ws_rd[cell_no].border = ctc_border
-                elif cols[col_idx] == "Driver Checks":
-                    val = self._combine_driver_check_errs(val, row["is-signed"])
+                elif cols[col_idx] == "Supported Flag Check":
+                    val = self._supported_sig_errs(val, row["is-signed"])
                     if len(val) > 0:
                         ws_rd[cell_no] = '\n'.join(val)
                         ws_rd[cell_no].font = ctc_font
