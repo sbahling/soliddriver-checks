@@ -220,10 +220,10 @@ class RPMsExporter:
             columns=[
                 "Vendor",
                 "Total KMPs",
-                "Driver Checks",
                 "License",
                 "Signature",
                 "Weak Module Invoked",
+                "Supported Flag/Signature Checks Failed",
                 "Symbols Check Failed",
                 "Modalias Check Failed", 
             ]
@@ -238,7 +238,7 @@ class RPMsExporter:
             
             return num
 
-        def supported_check(rpms_sf, rpms_is):
+        def supported_sig_check(rpms_sf, rpms_is):
             """
             rpms_sf: RPMs' driver supported flag
             rpm_is : RPMs' is_signed column
@@ -257,7 +257,7 @@ class RPMsExporter:
                 if not found_issues:
                     num += 1
 
-            return num
+            return rpms - num
 
         def license_check(vld_lics, rpm_licenses, driver_license):
             count = 0
@@ -278,7 +278,7 @@ class RPMsExporter:
         for v in vendors:
             df_vendor = df.loc[df["vendor"] == v]
             total = len(df_vendor.index)
-            spc = supported_check(df_vendor["df-supported"], df_vendor["is-signed"])
+            spc = supported_sig_check(df_vendor["df-supported"], df_vendor["is-signed"])
             symc = len(
                 df_vendor.loc[df_vendor["sym-check"] == "failed", "sym-check"].index
             )
@@ -299,10 +299,10 @@ class RPMsExporter:
                 {
                     "Vendor": v,
                     "Total KMPs": total,
-                    "Driver Checks": f"{spc} ({spc/total * 100:.2f}%)",
                     "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
                     "Weak Module Invoked": f"{wm_invoked} ({wm_invoked/total * 100:.2f}%)",
+                    "Supported Flag/Signature Checks Failed": f"{spc} ({spc/total * 100:.2f}%)",
                     "Symbols Check Failed": f"{symc} ({symc/total * 100:.2f}%)",
                     "Modalias Check Failed": f"{aliasc} ({aliasc/total * 100:.2f}%)",
                 },
@@ -328,7 +328,7 @@ class RPMsExporter:
                 for i, row in df_summary.iterrows():
                     vendor = row["Vendor"]
                     total_rpms = row["Total KMPs"]
-                    dc = row["Driver Checks"]
+                    ssc = row["Supported Flag/Signature Checks Failed"]
                     lic_check = row["License"]
                     signature = row["Signature"]
                     wm_invoked = row["Weak Module Invoked"]
@@ -338,7 +338,7 @@ class RPMsExporter:
                     row_passed = False
                     if (
                         vendor != ""
-                        and int(dc.split(" ")[0]) == total_rpms
+                        and int(ssc.split(" ")[0]) == 0
                         and int(lic_check.split(" ")[0]) == total_rpms
                         and int(signature.split(" ")[0]) == total_rpms
                         and int(wm_invoked.split(" ")[0]) == total_rpms
@@ -356,13 +356,6 @@ class RPMsExporter:
                             tv.set_attribute("class", "important_failed")
                         with td(total_rpms) as t:
                             t.set_attribute("class", "summary_total")
-                        with td(dc) as t:
-                            if int(dc.split(" ")[0]) != total_rpms:
-                                t.set_attribute(
-                                    "class", "critical_failed summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
                         with td(lic_check) as t:
                             if int(lic_check.split(" ")[0]) != total_rpms:
                                 t.set_attribute(
@@ -379,6 +372,13 @@ class RPMsExporter:
                                 t.set_attribute("class", "summary_number")
                         with td(wm_invoked) as t:
                             if int(wm_invoked.split(" ")[0]) != total_rpms:
+                                t.set_attribute(
+                                    "class", "critical_failed summary_number"
+                                )
+                            else:
+                                t.set_attribute("class", "summary_number")
+                        with td(ssc) as t:
+                            if int(ssc.split(" ")[0]) != 0:
                                 t.set_attribute(
                                     "class", "critical_failed summary_number"
                                 )
@@ -409,11 +409,11 @@ class RPMsExporter:
                 "path": "Path",
                 "vendor": "Vendor",
                 "signature": "Signature",
-                # "distribution": "Distribution",
                 "license": "License",
                 "wm-invoked": "Weak Module Invoked",
                 "df-supported": "Driver Checks",
                 "sym-check": "Symbols Check",
+                "modalias": "Modalias Check",
                 "dv-licenses": "Driver Licenses",
                 "is-signed": "is-signed",
             }
@@ -454,7 +454,7 @@ class RPMsExporter:
             tb.set_attribute("class", "table_center")
             with tr():
                 th("KMP Checks", colspan=6).set_attribute("class", f"detail_rpm")
-                th("Kernel Module Checks", colspan=2).set_attribute("class", f"detail_kernel_module")
+                th("Kernel Module Checks", colspan=3).set_attribute("class", f"detail_kernel_module")
             with tr():
                 th("Name").set_attribute("class", f"detail_0")
                 th("Path").set_attribute("class", f"detail_1")
@@ -463,7 +463,8 @@ class RPMsExporter:
                 th(raw("License<span class=\"tooltiptext\">KMP and it's kernel modules should use open source licenses.</span>")).set_attribute("class", f"detail_4 tooltip")
                 th(raw("Weak Module Invoked<span class=\"tooltiptext\">Weak Module is necessary to make 3rd party kernel modules installed for one kernel available to KABI-compatible kernels. </span>")).set_attribute("class", f"detail_5 tooltip")
                 th(raw("Supported Flag/Signature<span class=\"tooltiptext\">\"supported\" flag: <br/>  \"yes\": Only supported by SUSE<br/>  \"external\": supported by both SUSE and vendor</span>")).set_attribute("class", f"detail_6 tooltip")
-                th(raw("Symbols<span class=\"tooltiptext\">symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
+                th(raw("Symbols<span class=\"tooltiptext\">Symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
+                th(raw("Modalias<span class=\"tooltiptext\">Modalias check is to check whether the modalias in kernel modules matches the modalias in its package.</span>")).set_attribute("class", f"detail_8 tooltip")
 
             for i, row in df.iterrows():
                 with tr() as r:
