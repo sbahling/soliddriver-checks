@@ -7,6 +7,7 @@ import pandas as pd
 import re
 from collections import namedtuple
 import tempfile
+import fnmatch
 import json
 from scp import SCPClient
 from paramiko.ssh_exception import NoValidConnectionsError, SSHException
@@ -90,8 +91,41 @@ class RPMReader:
             "sym-check",
             "dv-licenses",
             "is-signed",
+            "modalias",
         ]
 
+    def _get_driver_alias(self, driver):
+        alias = run_cmd("/usr/sbin/modinfo --field=alias %s" % driver)
+        return alias.splitlines()
+        
+    def _get_rpm_modalias(self, rpm):
+        modalias = namedtuple("modalias", "kernel_flavor pci_re")
+        ml_pci_re = re.compile(r"modalias\((.*):(.*\:.*)\)") # example: modalias(kernel-default:pci:v000019A2d00000712sv*sd*bc*sc*i*)
+        ml_all_re = re.compile(r"modalias\((.*):(.*)\)")     # example: packageand(kernel-default:primergy-be2iscsi)
+        raw_modalias = run_cmd("rpm -q --supplements %s" %rpm)
+        
+        mod_sup = {} #TODO We should only need the alias regex, will simply this code after discussed with Scott.
+        alias_re = []
+        for line in raw_modalias.splitlines():
+            line = str(line, "utf-8").strip()
+            pci_rst = ml_pci_re.match(line)
+            all_rst = ml_all_re.match(line)
+            if pci_rst:
+                ker_flavor, pci = pci_rst.groups()
+                mod_sup[pci] = modalias(
+                    kernel_flavor=ker_flavor, pci_re=pci
+                )
+                alias_re.append(pci)
+            elif all_rst: # match all (*) should not be allowed
+                ker_flavor, rst = all_rst.groups()
+                mod_sup[rst] = modalias(
+                    kernel_flavor=ker_flavor, pci_re=rst
+                )
+                alias_re.append(rst)
+        
+        return alias_re
+        # return mod_sup
+    
     def _driver_symbols_check(self, rpm_symbols, driver):
         symvers = run_cmd("/usr/sbin/modprobe --dump-modversions %s" % driver)
 
@@ -148,7 +182,6 @@ class RPMReader:
             if values[0].strip() == "supported":
                 if supported != "":  # only allow appears once.
                     supported = supported + ", " + ":".join(values[1:]).strip()
-                    # return "Multiple"
                 else:
                     supported = ":".join(values[1:]).strip()
 
@@ -204,6 +237,31 @@ class RPMReader:
                 symbols[d] = d_info
 
         return symbols
+    
+    def _fmt_driver_modalias(self, kmp_alias, drivers):
+        # for a in kmp_alias:
+        #     if a == "*":
+        #         return "RPM intend to match all the hardware which is not recommended!"
+        
+        unmatched_ker_alias = []
+        unmatched_kmp_alias = kmp_alias.copy()
+
+        for d in drivers:
+            for ker_a in drivers[d]["alias"]:
+                ker_a = str(ker_a, "utf-8").strip()
+                found = False
+                for kmp_a in kmp_alias:
+                    if fnmatch.fnmatch(ker_a.strip(), kmp_a.strip()):
+                        found = True
+                        for uk in unmatched_kmp_alias:
+                            if uk.strip() == kmp_a.strip():
+                                unmatched_kmp_alias.remove(uk)
+                                break
+                        break
+                if not found:
+                    unmatched_ker_alias.append(ker_a)
+                
+        return {'unmatched_km_alias':unmatched_ker_alias, 'unmatched_kmp_alias':unmatched_kmp_alias}
 
     def _is_driver_signed(self, driver):
         raw_info = run_cmd("/usr/sbin/modinfo %s" % driver)
@@ -243,6 +301,7 @@ class RPMReader:
             item["supported"] = self._get_driver_supported(driver)
             item["license"] = self._get_driver_license(driver)
             item["is_signed"] = self._is_driver_signed(driver)
+            item["alias"] = self._get_driver_alias(driver)
 
             dpath = str(driver)
             dpath = dpath[dpath.startswith(tmp.name) + len(tmp.name) - 1 :]
@@ -294,11 +353,13 @@ class RPMReader:
             symbols = dict()
             d_licenses = dict()
             is_signed = dict()
+            km_modalias = dict()
             if driver_checks is not None:
                 supported = self._fmt_driver_supported(driver_checks)
                 symbols = self._fmt_driver_symbol(driver_checks)
                 d_licenses = self._fmt_driver_license(driver_checks)
                 is_signed = self._fmt_driver_is_signed(driver_checks)
+                km_modalias = self._fmt_driver_modalias(self._get_rpm_modalias(rpm), driver_checks)
 
             if not self._query_filter(supported, query):
                 continue
@@ -316,7 +377,8 @@ class RPMReader:
                         supported,
                         symbols,
                         d_licenses,
-                        is_signed
+                        is_signed, 
+                        km_modalias
                     ]
                 )
 

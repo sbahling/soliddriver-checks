@@ -168,20 +168,9 @@ class RPMsExporter:
 
         result = ""
         if unfound_no > 0:
-            # result = "Can not find symbols like {} ... in RPM! ".format(
-            #     val["unfound"][0]
-            # )
-            
             result = f"Number of symbols can not be found in KMP: {unfound_no}"
 
         if cs_mm_no > 0:
-            # result = (
-            #     result
-            #     + "Symbols check sum like {} ... does not match in RPM!".format(
-            #         val["checksum-mismatch"][0]
-            #     )
-            # )
-            
             result = result + f"  Number of symbols checksum does not match: {cs_mm_no}"
 
         return result
@@ -236,10 +225,20 @@ class RPMsExporter:
                 "Signature",
                 "Weak Module Invoked",
                 "Symbols Check Failed",
+                "Modalias Check Failed", 
             ]
         )
+        
+        def alias_check(alias):
+            num = 0
+            
+            for i in range(len(alias)):
+                if len(alias.iat[i]["unmatched_km_alias"]) > 0 and len(alias.iat[i]["unmatched_kmp_alias"]) > 0:
+                    num != 1
+            
+            return num
 
-        def drivers_check(rpms_sf, rpms_is):
+        def supported_check(rpms_sf, rpms_is):
             """
             rpms_sf: RPMs' driver supported flag
             rpm_is : RPMs' is_signed column
@@ -279,8 +278,8 @@ class RPMsExporter:
         for v in vendors:
             df_vendor = df.loc[df["vendor"] == v]
             total = len(df_vendor.index)
-            dc = drivers_check(df_vendor["df-supported"], df_vendor["is-signed"])
-            failed = len(
+            spc = supported_check(df_vendor["df-supported"], df_vendor["is-signed"])
+            symc = len(
                 df_vendor.loc[df_vendor["sym-check"] == "failed", "sym-check"].index
             )
             lic_check = license_check(
@@ -294,16 +293,18 @@ class RPMsExporter:
                 ].index
             )
             wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
+            aliasc = alias_check(df_vendor["modalias"])
 
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
                     "Total KMPs": total,
-                    "Driver Checks": f"{dc} ({dc/total * 100:.2f}%)",
+                    "Driver Checks": f"{spc} ({spc/total * 100:.2f}%)",
                     "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
                     "Weak Module Invoked": f"{wm_invoked} ({wm_invoked/total * 100:.2f}%)",
-                    "Symbols Check Failed": f"{failed} ({failed/total * 100:.2f}%)",
+                    "Symbols Check Failed": f"{symc} ({symc/total * 100:.2f}%)",
+                    "Modalias Check Failed": f"{aliasc} ({aliasc/total * 100:.2f}%)",
                 },
                 ignore_index=True,
             )
@@ -332,6 +333,7 @@ class RPMsExporter:
                     signature = row["Signature"]
                     wm_invoked = row["Weak Module Invoked"]
                     sym_failed = row["Symbols Check Failed"]
+                    alias_failed = row["Modalias Check Failed"]
 
                     row_passed = False
                     if (
@@ -341,6 +343,7 @@ class RPMsExporter:
                         and int(signature.split(" ")[0]) == total_rpms
                         and int(wm_invoked.split(" ")[0]) == total_rpms
                         and int(sym_failed.split(" ")[0]) == 0
+                        and int(alias_failed.split(" ")[0]) == 0
                     ):
                         row_passed = True
                     with tr() as r:
@@ -385,6 +388,13 @@ class RPMsExporter:
                             if int(sym_failed.split(" ")[0]) != 0:
                                 t.set_attribute(
                                     "class", "critical_failed summary_number"
+                                )
+                            else:
+                                t.set_attribute("class", "summary_number")
+                        with td(alias_failed) as t:
+                            if int(alias_failed.split(" ")[0]) > 0:
+                                t.set_attribute(
+                                    "class", "important_falied summary_number"
                                 )
                             else:
                                 t.set_attribute("class", "summary_number")
