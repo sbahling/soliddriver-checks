@@ -104,7 +104,6 @@ class RPMReader:
         ml_all_re = re.compile(r"modalias\((.*):(.*)\)")     # example: packageand(kernel-default:primergy-be2iscsi)
         raw_modalias = run_cmd("rpm -q --supplements %s" %rpm)
         
-        mod_sup = {} #TODO We should only need the alias regex, will simply this code after discussed with Scott.
         alias_re = []
         for line in raw_modalias.splitlines():
             line = str(line, "utf-8").strip()
@@ -112,15 +111,9 @@ class RPMReader:
             all_rst = ml_all_re.match(line)
             if pci_rst:
                 ker_flavor, pci = pci_rst.groups()
-                mod_sup[pci] = modalias(
-                    kernel_flavor=ker_flavor, pci_re=pci
-                )
                 alias_re.append(pci)
             elif all_rst: # match all (*) should not be allowed
                 ker_flavor, rst = all_rst.groups()
-                mod_sup[rst] = modalias(
-                    kernel_flavor=ker_flavor, pci_re=rst
-                )
                 alias_re.append(rst)
         
         return alias_re
