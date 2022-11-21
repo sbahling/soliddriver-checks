@@ -114,7 +114,7 @@ def dst_is_ok(dst, out_format):
     "out_format",
     type=click.Choice(FORMAT_TYPES),
     default="json",
-    help="Specify output format",
+    help="Specify output format (PDF is in Beta)",
 )
 @click.option(
     "--query",

@@ -95,7 +95,7 @@ class RPMReader:
         ]
 
     def _get_driver_alias(self, driver):
-        alias = run_cmd("/usr/sbin/modinfo --field=alias %s" % driver)
+        alias = run_cmd("/usr/sbin/modinfo --field=alias %s | grep pci:" % driver)
         return alias.splitlines()
         
     def _get_rpm_modalias(self, rpm):
@@ -111,13 +111,14 @@ class RPMReader:
             all_rst = ml_all_re.match(line)
             if pci_rst:
                 ker_flavor, pci = pci_rst.groups()
-                alias_re.append(pci)
+                if "pci:" in pci: # only check PCI devices
+                    alias_re.append(pci)
             elif all_rst: # match all (*) should not be allowed
                 ker_flavor, rst = all_rst.groups()
-                alias_re.append(rst)
+                if rst == "*":
+                    alias_re.append(rst)
         
         return alias_re
-        # return mod_sup
     
     def _driver_symbols_check(self, rpm_symbols, driver):
         symvers = run_cmd("/usr/sbin/modprobe --dump-modversions %s" % driver)
@@ -232,9 +233,14 @@ class RPMReader:
         return symbols
     
     def _fmt_driver_modalias(self, kmp_alias, drivers):
-        # for a in kmp_alias:
-        #     if a == "*":
-        #         return "RPM intend to match all the hardware which is not recommended!"
+        key_match_all = 'match_all'
+        key_unmatched_km_alias = 'unmatched_km_alias'
+        key_unmatched_kmp_alias = 'unmatched_kmp_alias'
+        for a in kmp_alias:
+            if a == "*":  # "use default-kernel:* to match all the devices is always a bad idea."
+                return {key_match_all:True, 
+                key_unmatched_km_alias:[], 
+                key_unmatched_kmp_alias:[]}
         
         unmatched_ker_alias = []
         unmatched_kmp_alias = kmp_alias.copy()
@@ -253,8 +259,22 @@ class RPMReader:
                         break
                 if not found:
                     unmatched_ker_alias.append(ker_a)
+        
+        # There has some packages have "%5" in the package but use "_" in the kernel module
+        # So we have to match it again, but equal is enough.
+        r_ukmpalias = [v.replace("_", "%5F").replace("-", "%2D").replace(".", "%2E") for v in unmatched_ker_alias]
+        for i in range(len(unmatched_kmp_alias) - 1, -1, -1):
+            found_match = False
+            for j in range(len(unmatched_ker_alias) - 1, -1, -1):
+                if r_ukmpalias[j] == unmatched_kmp_alias[i]:
+                    unmatched_ker_alias.pop(j)
+                    found_match = True
+            if found_match:
+                unmatched_kmp_alias.pop(i)
                 
-        return {'unmatched_km_alias':unmatched_ker_alias, 'unmatched_kmp_alias':unmatched_kmp_alias}
+        return {key_match_all:False, 
+                key_unmatched_km_alias:unmatched_ker_alias, 
+                key_unmatched_kmp_alias:unmatched_kmp_alias}
 
     def _is_driver_signed(self, driver):
         raw_info = run_cmd("/usr/sbin/modinfo %s" % driver)

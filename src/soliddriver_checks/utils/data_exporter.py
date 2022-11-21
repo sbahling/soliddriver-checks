@@ -228,14 +228,14 @@ class RPMsExporter:
                 "Modalias Check Failed", 
             ]
         )
-        
+
         def alias_check(alias):
             num = 0
-            
+
             for i in range(len(alias)):
-                if len(alias.iat[i]["unmatched_km_alias"]) > 0 and len(alias.iat[i]["unmatched_kmp_alias"]) > 0:
-                    num != 1
-            
+                if alias.iat[i]["match_all"] or len(alias.iat[i]["unmatched_km_alias"]) > 0 or len(alias.iat[i]["unmatched_kmp_alias"]) > 0:
+                    num += 1
+
             return num
 
         def supported_sig_check(rpms_sf, rpms_is):
@@ -447,8 +447,12 @@ class RPMsExporter:
         return chk_result
     
     def _fmt_modalias_check(self, alias):
+        match_all = alias["match_all"]
         km_unmatched = len(alias["unmatched_km_alias"])
         kmp_unmatched = len(alias["unmatched_kmp_alias"])
+        
+        if match_all:
+            return "KMP can match all the devices! Highly not recommended!"
         
         message = ""
         
