@@ -155,6 +155,7 @@ class ExcelTemplate:
 
         ws["A5"].value = _get_version()
         ws["A6"].value = _generate_timestamp()
+        ws.column_dimensions['A'].width = 200
 
 class RPMsExporter:
     def __init__(self):
@@ -168,20 +169,9 @@ class RPMsExporter:
 
         result = ""
         if unfound_no > 0:
-            # result = "Can not find symbols like {} ... in RPM! ".format(
-            #     val["unfound"][0]
-            # )
-            
             result = f"Number of symbols can not be found in KMP: {unfound_no}"
 
         if cs_mm_no > 0:
-            # result = (
-            #     result
-            #     + "Symbols check sum like {} ... does not match in RPM!".format(
-            #         val["checksum-mismatch"][0]
-            #     )
-            # )
-            
             result = result + f"  Number of symbols checksum does not match: {cs_mm_no}"
 
         return result
@@ -231,15 +221,25 @@ class RPMsExporter:
             columns=[
                 "Vendor",
                 "Total KMPs",
-                "Driver Checks",
                 "License",
                 "Signature",
                 "Weak Module Invoked",
+                "Supported Flag/Signature Checks Failed",
                 "Symbols Check Failed",
+                "Modalias Check Failed", 
             ]
         )
 
-        def drivers_check(rpms_sf, rpms_is):
+        def alias_check(alias):
+            num = 0
+
+            for i in range(len(alias)):
+                if alias.iat[i]["match_all"] or len(alias.iat[i]["unmatched_km_alias"]) > 0 or len(alias.iat[i]["unmatched_kmp_alias"]) > 0:
+                    num += 1
+
+            return num
+
+        def supported_sig_check(rpms_sf, rpms_is):
             """
             rpms_sf: RPMs' driver supported flag
             rpm_is : RPMs' is_signed column
@@ -258,7 +258,7 @@ class RPMsExporter:
                 if not found_issues:
                     num += 1
 
-            return num
+            return rpms - num
 
         def license_check(vld_lics, rpm_licenses, driver_license):
             count = 0
@@ -279,8 +279,8 @@ class RPMsExporter:
         for v in vendors:
             df_vendor = df.loc[df["vendor"] == v]
             total = len(df_vendor.index)
-            dc = drivers_check(df_vendor["df-supported"], df_vendor["is-signed"])
-            failed = len(
+            spc = supported_sig_check(df_vendor["df-supported"], df_vendor["is-signed"])
+            symc = len(
                 df_vendor.loc[df_vendor["sym-check"] == "failed", "sym-check"].index
             )
             lic_check = license_check(
@@ -294,16 +294,18 @@ class RPMsExporter:
                 ].index
             )
             wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
+            aliasc = alias_check(df_vendor["modalias"])
 
             df_summary = df_summary.append(
                 {
                     "Vendor": v,
                     "Total KMPs": total,
-                    "Driver Checks": f"{dc} ({dc/total * 100:.2f}%)",
                     "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
                     "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
                     "Weak Module Invoked": f"{wm_invoked} ({wm_invoked/total * 100:.2f}%)",
-                    "Symbols Check Failed": f"{failed} ({failed/total * 100:.2f}%)",
+                    "Supported Flag/Signature Checks Failed": f"{spc} ({spc/total * 100:.2f}%)",
+                    "Symbols Check Failed": f"{symc} ({symc/total * 100:.2f}%)",
+                    "Modalias Check Failed": f"{aliasc} ({aliasc/total * 100:.2f}%)",
                 },
                 ignore_index=True,
             )
@@ -327,20 +329,22 @@ class RPMsExporter:
                 for i, row in df_summary.iterrows():
                     vendor = row["Vendor"]
                     total_rpms = row["Total KMPs"]
-                    dc = row["Driver Checks"]
+                    ssc = row["Supported Flag/Signature Checks Failed"]
                     lic_check = row["License"]
                     signature = row["Signature"]
                     wm_invoked = row["Weak Module Invoked"]
                     sym_failed = row["Symbols Check Failed"]
+                    alias_failed = row["Modalias Check Failed"]
 
                     row_passed = False
                     if (
                         vendor != ""
-                        and int(dc.split(" ")[0]) == total_rpms
+                        and int(ssc.split(" ")[0]) == 0
                         and int(lic_check.split(" ")[0]) == total_rpms
                         and int(signature.split(" ")[0]) == total_rpms
                         and int(wm_invoked.split(" ")[0]) == total_rpms
                         and int(sym_failed.split(" ")[0]) == 0
+                        and int(alias_failed.split(" ")[0]) == 0
                     ):
                         row_passed = True
                     with tr() as r:
@@ -353,13 +357,6 @@ class RPMsExporter:
                             tv.set_attribute("class", "important_failed")
                         with td(total_rpms) as t:
                             t.set_attribute("class", "summary_total")
-                        with td(dc) as t:
-                            if int(dc.split(" ")[0]) != total_rpms:
-                                t.set_attribute(
-                                    "class", "critical_failed summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
                         with td(lic_check) as t:
                             if int(lic_check.split(" ")[0]) != total_rpms:
                                 t.set_attribute(
@@ -381,10 +378,24 @@ class RPMsExporter:
                                 )
                             else:
                                 t.set_attribute("class", "summary_number")
+                        with td(ssc) as t:
+                            if int(ssc.split(" ")[0]) != 0:
+                                t.set_attribute(
+                                    "class", "critical_failed summary_number"
+                                )
+                            else:
+                                t.set_attribute("class", "summary_number")
                         with td(sym_failed) as t:
                             if int(sym_failed.split(" ")[0]) != 0:
                                 t.set_attribute(
                                     "class", "critical_failed summary_number"
+                                )
+                            else:
+                                t.set_attribute("class", "summary_number")
+                        with td(alias_failed) as t:
+                            if int(alias_failed.split(" ")[0]) > 0:
+                                t.set_attribute(
+                                    "class", "important_falied summary_number"
                                 )
                             else:
                                 t.set_attribute("class", "summary_number")
@@ -399,11 +410,11 @@ class RPMsExporter:
                 "path": "Path",
                 "vendor": "Vendor",
                 "signature": "Signature",
-                # "distribution": "Distribution",
                 "license": "License",
                 "wm-invoked": "Weak Module Invoked",
-                "df-supported": "Driver Checks",
+                "df-supported": "Supported Flag Check",
                 "sym-check": "Symbols Check",
+                "modalias": "Modalias Check",
                 "dv-licenses": "Driver Licenses",
                 "is-signed": "is-signed",
             }
@@ -435,6 +446,30 @@ class RPMsExporter:
                 )
 
         return chk_result
+    
+    def _fmt_modalias_check(self, alias):
+        match_all = alias["match_all"]
+        km_unmatched = len(alias["unmatched_km_alias"])
+        kmp_unmatched = len(alias["unmatched_kmp_alias"])
+        
+        if match_all:
+            return "KMP can match all the devices! Highly not recommended!"
+        
+        message = ""
+        
+        if km_unmatched > 0:
+            message += "Alias found in kernel module but no match in it's package: "
+            for kmu in alias["unmatched_km_alias"]:
+                message += kmu + ", "
+            message += "\n"
+        
+        if kmp_unmatched > 0:
+            message += "Alias found in the package but no match in it's kernel module: "
+            for kmpu in alias["unmatched_kmp_alias"]:
+                message += kmpu + ", "
+        
+        return message
+        
 
     def _get_table_detail_html(self, rpm_table):
         df = self._rename_rpm_detail_columns(rpm_table)
@@ -444,7 +479,7 @@ class RPMsExporter:
             tb.set_attribute("class", "table_center")
             with tr():
                 th("KMP Checks", colspan=6).set_attribute("class", f"detail_rpm")
-                th("Kernel Module Checks", colspan=2).set_attribute("class", f"detail_kernel_module")
+                th("Kernel Module Checks", colspan=3).set_attribute("class", f"detail_kernel_module")
             with tr():
                 th("Name").set_attribute("class", f"detail_0")
                 th("Path").set_attribute("class", f"detail_1")
@@ -453,7 +488,8 @@ class RPMsExporter:
                 th(raw("License<span class=\"tooltiptext\">KMP and it's kernel modules should use open source licenses.</span>")).set_attribute("class", f"detail_4 tooltip")
                 th(raw("Weak Module Invoked<span class=\"tooltiptext\">Weak Module is necessary to make 3rd party kernel modules installed for one kernel available to KABI-compatible kernels. </span>")).set_attribute("class", f"detail_5 tooltip")
                 th(raw("Supported Flag/Signature<span class=\"tooltiptext\">\"supported\" flag: <br/>  \"yes\": Only supported by SUSE<br/>  \"external\": supported by both SUSE and vendor</span>")).set_attribute("class", f"detail_6 tooltip")
-                th(raw("Symbols<span class=\"tooltiptext\">symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
+                th(raw("Symbols<span class=\"tooltiptext\">Symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
+                th(raw("Modalias<span class=\"tooltiptext\">Modalias check is to check whether the modalias in kernel modules matches the modalias in its package.</span>")).set_attribute("class", f"detail_8 tooltip")
 
             for i, row in df.iterrows():
                 with tr() as r:
@@ -467,9 +503,11 @@ class RPMsExporter:
                     sym_check = self._get_sym_check_failed(
                         row["Symbols Check"]
                     ).replace("\n", "</br>")
-                    supported = row["Driver Checks"]
+                    supported = row["Supported Flag Check"]
                     is_signed = row["is-signed"]
-                    dc_err = self._combine_driver_check_errs(supported, is_signed)
+                    alias = row["Modalias Check"]
+                    alias_chk = self._fmt_modalias_check(alias)
+                    dc_err = self._supported_sig_errs(supported, is_signed)
                     dv_license = row["Driver Licenses"]
                     lcs_chk = self._fmt_driver_license_check(
                         license, dv_license, vld_lic
@@ -490,7 +528,6 @@ class RPMsExporter:
                     else:
                         ts = td(signature)
                         ts.set_attribute("class", "important_failed")
-                    # td(distribution)
                     if lcs_chk == "":  # license check
                         if license == "":
                             tl = td("No License")
@@ -525,10 +562,17 @@ class RPMsExporter:
                         t_w = td(raw(sym_check))
                         t_w.set_attribute("class", "critical_failed")
                         r.set_attribute("class", "critical_failed_row")
+                    if alias_chk == "":
+                        t = td("All passed!")
+                        t.set_attribute("class", "detail_pass")
+                    else:
+                        t_w = td(raw(alias_chk.replace("\n", "</br>")))
+                        t_w.set_attribute("class", "important_failed")
+                        r.set_attribute("class", "important_failed_row")
 
         return tb
 
-    def _combine_driver_check_errs(self, sffds, nsds):
+    def _supported_sig_errs(self, sffds, nsds):
         sfds_l = self._get_supported_driver_failed(sffds)
         nsds_l = self._get_no_signed_driver(nsds)
 
@@ -658,7 +702,16 @@ class RPMsExporter:
         sym_failed = Rule(type="expression", dxf=ctc_style)
         sym_failed.formula = ['VALUE(LEFT($G2, FIND(" ", $G2) - 1)) <> 0']
         ws_vs.conditional_formatting.add(f"G2:G{last_record_row_no}", sym_failed)
-
+        
+        ws_vs.column_dimensions['A'].width = 30
+        ws_vs.column_dimensions['B'].width = 15
+        ws_vs.column_dimensions['C'].width = 15
+        ws_vs.column_dimensions['D'].width = 15
+        ws_vs.column_dimensions['E'].width = 15
+        ws_vs.column_dimensions['F'].width = 15
+        ws_vs.column_dimensions['G'].width = 15
+        ws_vs.column_dimensions['H'].width = 15
+        
     def _xlsx_create_rpm_details(self, wb, rpm_table):
         df = self._rename_rpm_detail_columns(rpm_table)
         ws_rd = wb.create_sheet("KMPs details")
@@ -695,7 +748,7 @@ class RPMsExporter:
         ws_rd['A1'].border = header_border
         ws_rd['A1'].alignment = center_align
         
-        ws_rd.merge_cells('H1:I1')
+        ws_rd.merge_cells('H1:L1')
         ws_rd['H1'] = "Kernel Module Checks"
         ws_rd['H1'].font = header_font
         ws_rd['H1'].fill = header_fill
@@ -741,8 +794,8 @@ class RPMsExporter:
                         ws_rd[cell_no].font = ctc_font
                         ws_rd[cell_no].fill = ctc_fill
                         ws_rd[cell_no].border = ctc_border
-                elif cols[col_idx] == "Driver Checks":
-                    val = self._combine_driver_check_errs(val, row["is-signed"])
+                elif cols[col_idx] == "Supported Flag Check":
+                    val = self._supported_sig_errs(val, row["is-signed"])
                     if len(val) > 0:
                         ws_rd[cell_no] = '\n'.join(val)
                         ws_rd[cell_no].font = ctc_font
@@ -769,6 +822,18 @@ class RPMsExporter:
                         ws_rd[cell_no].font = imt_font
                         ws_rd[cell_no].fill = imt_fill
                         ws_rd[cell_no].border = imt_border
+                elif cols[col_idx] == "Modalias Check":
+                    alias_check = self._fmt_modalias_check(row["Modalias Check"])
+                    if alias_check != "":
+                        ws_rd[cell_no] = alias_check
+                        ws_rd[cell_no].font = imt_font
+                        ws_rd[cell_no].fill = imt_fill
+                        ws_rd[cell_no].border = imt_border
+                    else:
+                        val = "All passed!"
+                        ws_rd[cell_no] = val
+                        ws_rd[cell_no].alignment = center_align
+                    
                 else:  # no format needed.
                     ws_rd[cell_no] = str(val)
 
@@ -783,6 +848,16 @@ class RPMsExporter:
         sig_rule = Rule(type="expression", dxf=ctc_style)
         sig_rule.formula = ['=OR($D2 = "", $D2 = "(none)")']
         ws_rd.conditional_formatting.add(f"D2:D{records}", sig_rule)
+        
+        ws_rd.column_dimensions['A'].width = 30
+        ws_rd.column_dimensions['B'].width = 40
+        ws_rd.column_dimensions['C'].width = 30
+        ws_rd.column_dimensions['D'].width = 30
+        ws_rd.column_dimensions['F'].width = 20
+        ws_rd.column_dimensions['G'].width = 15
+        ws_rd.column_dimensions['H'].width = 40
+        ws_rd.column_dimensions['I'].width = 40
+        ws_rd.column_dimensions['L'].width = 40
 
     def _xlsx_create_report_workbook(self):
         wb = Workbook()
