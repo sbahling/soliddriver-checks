@@ -155,6 +155,7 @@ class ExcelTemplate:
 
         ws["A5"].value = _get_version()
         ws["A6"].value = _generate_timestamp()
+        ws.column_dimensions['A'].width = 200
 
 class RPMsExporter:
     def __init__(self):
@@ -701,7 +702,16 @@ class RPMsExporter:
         sym_failed = Rule(type="expression", dxf=ctc_style)
         sym_failed.formula = ['VALUE(LEFT($G2, FIND(" ", $G2) - 1)) <> 0']
         ws_vs.conditional_formatting.add(f"G2:G{last_record_row_no}", sym_failed)
-
+        
+        ws_vs.column_dimensions['A'].width = 30
+        ws_vs.column_dimensions['B'].width = 15
+        ws_vs.column_dimensions['C'].width = 15
+        ws_vs.column_dimensions['D'].width = 15
+        ws_vs.column_dimensions['E'].width = 15
+        ws_vs.column_dimensions['F'].width = 15
+        ws_vs.column_dimensions['G'].width = 15
+        ws_vs.column_dimensions['H'].width = 15
+        
     def _xlsx_create_rpm_details(self, wb, rpm_table):
         df = self._rename_rpm_detail_columns(rpm_table)
         ws_rd = wb.create_sheet("KMPs details")
@@ -738,7 +748,7 @@ class RPMsExporter:
         ws_rd['A1'].border = header_border
         ws_rd['A1'].alignment = center_align
         
-        ws_rd.merge_cells('H1:I1')
+        ws_rd.merge_cells('H1:L1')
         ws_rd['H1'] = "Kernel Module Checks"
         ws_rd['H1'].font = header_font
         ws_rd['H1'].fill = header_fill
@@ -812,6 +822,18 @@ class RPMsExporter:
                         ws_rd[cell_no].font = imt_font
                         ws_rd[cell_no].fill = imt_fill
                         ws_rd[cell_no].border = imt_border
+                elif cols[col_idx] == "Modalias Check":
+                    alias_check = self._fmt_modalias_check(row["Modalias Check"])
+                    if alias_check != "":
+                        ws_rd[cell_no] = alias_check
+                        ws_rd[cell_no].font = imt_font
+                        ws_rd[cell_no].fill = imt_fill
+                        ws_rd[cell_no].border = imt_border
+                    else:
+                        val = "All passed!"
+                        ws_rd[cell_no] = val
+                        ws_rd[cell_no].alignment = center_align
+                    
                 else:  # no format needed.
                     ws_rd[cell_no] = str(val)
 
@@ -826,6 +848,16 @@ class RPMsExporter:
         sig_rule = Rule(type="expression", dxf=ctc_style)
         sig_rule.formula = ['=OR($D2 = "", $D2 = "(none)")']
         ws_rd.conditional_formatting.add(f"D2:D{records}", sig_rule)
+        
+        ws_rd.column_dimensions['A'].width = 30
+        ws_rd.column_dimensions['B'].width = 40
+        ws_rd.column_dimensions['C'].width = 30
+        ws_rd.column_dimensions['D'].width = 30
+        ws_rd.column_dimensions['F'].width = 20
+        ws_rd.column_dimensions['G'].width = 15
+        ws_rd.column_dimensions['H'].width = 40
+        ws_rd.column_dimensions['I'].width = 40
+        ws_rd.column_dimensions['L'].width = 40
 
     def _xlsx_create_report_workbook(self):
         wb = Workbook()
