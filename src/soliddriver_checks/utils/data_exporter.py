@@ -24,383 +24,258 @@ from openpyxl import Workbook
 from jinja2 import Environment, FileSystemLoader
 import re
 from copy import copy
-from datetime import datetime
-from ..version import __VERSION__
+from ..config import SDCConf, ExcelTemplate, get_version, generate_timestamp
+from .data_reader import KMPEvaluation
 
 
-def _get_version():
-    return f"version: {__VERSION__}"
+def to_dataframe(data):
+    df = pd.DataFrame()
 
-def _generate_timestamp():
-    return f"timestamp: {datetime.now()}"
+    for item in data:
+        new_row = pd.Series({
+            "level"           : item["level"],
+            "name"            : item["name"],
+            "path"            : item["path"],
+            "vendor"          : item["vendor"],
+            "signature"       : item["signature"],
+            "license"         : item["license"],
+            "wm2_invoked"     : item["wm2_invoked"],
+            "supported_flag"  : item["km"]["supported"],
+            "km_signatures"   : item["km"]["signature"],
+            "km_licenses"     : item["km"]["license"],
+            "symbols"         : item["km"]["symbols"],
+            "modalias"        : item["km"]["alias"]
+            })
+        df = pd.concat([df, new_row.to_frame().T], ignore_index=True)
 
+    return df
 
-class SDCConf:
-    def __init__(self):
-        pkg_path = os.path.dirname(__file__)
-        cfg_path = f"{pkg_path}/../config/soliddriver-checks.conf"
-
-        with open(cfg_path, "r") as fp:
-            self._conf = json.load(fp)
-
-    def _get_xlsx_info(self, *locs):
-        conf = self._conf
-        for loc in locs:
-            conf = conf[loc]
-
-        font = Font(
-            name=conf["font"]["family"],
-            size=conf["font"]["size"],
-            bold=conf["font"]["bold"],
-            color=conf["font"]["color"],
-        )
-        sd = Side(
-            border_style=conf["side"]["border_style"], color=conf["side"]["color"]
-        )
-        bd = Border(top=sd, left=sd, right=sd, bottom=sd)
-        fill = PatternFill(
-            start_color=conf["fill"]["bgcolor"],
-            end_color=conf["fill"]["bgcolor"],
-            fill_type="solid",
-        )
-
-        return font, bd, fill
-
-    def get_valid_licenses(self):
-        return self._conf["valid-licenses"]
-
-    def get_rpm_xslx_table_header(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "header")
-
-    def get_rpm_xslx_table_normal(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "data", "normal")
-
-    def get_rpm_xslx_table_important_failed(self):
-        return self._get_xlsx_info(
-            "rpm-check", "excel", "table", "data", "important-failed"
-        )
-
-    def get_rpm_xslx_table_critical_failed(self):
-        return self._get_xlsx_info(
-            "rpm-check", "excel", "table", "data", "critical-failed"
-        )
-
-    def get_rpm_xslx_table_great_row(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "row", "great")
-
-    def get_rpm_xslx_table_warn_row(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "row", "warn")
-
-    def get_driver_html_warn_critical(self):
-        return self._conf["driver-check"]["html"]["critical_failed"]
-
-    def get_driver_sig_keys(self):
-        return self._conf["driver-check"]["sig-keys"]
-
-    def get_driver_html_warn_important(self):
-        return self._conf["driver-check"]["html"]["important_failed"]
-
-    def get_driver_xslx_table_header(self):
-        return self._get_xlsx_info("driver-check", "excel", "table", "header")
-
-    def get_driver_xslx_table_normal(self):
-        return self._get_xlsx_info("driver-check", "excel", "table", "data", "normal")
-
-    def get_driver_xslx_table_important_failed(self):
-        return self._get_xlsx_info(
-            "driver-check", "excel", "table", "data", "important-failed"
-        )
-
-    def get_driver_xslx_table_critical_failed(self):
-        return self._get_xlsx_info(
-            "driver-check", "excel", "table", "data", "critical-failed"
-        )
-
-    def get_driver_xslx_table_warn_row(self):
-        return self._get_xlsx_info("driver-check", "excel", "table", "row", "warn")
-
-
-def ValidLicense(license, licenses):
-    for lic in licenses:
-        if lic["name"] == license:
-            return True
-
-    return False
-
-
-class ExcelTemplate:
-    def __init__(self):
-        pkg_path = os.path.dirname(__file__)
-        self._cfg_path = f"{pkg_path}/../config/templates/templates.xlsx"
-
-    def set_driver_check_overview(self, ws):
-        self._copy_work_sheep("km-report-overview", ws)
-
-    def set_rpm_check_overview(self, ws):
-        self._copy_work_sheep("kmp-report-overview", ws)
-
-    def _copy_work_sheep(self, title, ws):
-        tmpl = load_workbook(filename=self._cfg_path)
-        cover = tmpl[title]
-
-        ws.title = "Overview"
-        for row in cover.rows:
-            for cell in row:
-                ws[cell.coordinate].value = copy(cell.value)
-                # ws[cell.coordinate].style = copy(cell.style)
-                ws[cell.coordinate].font = copy(cell.font)
-                ws[cell.coordinate].border = copy(cell.border)
-                ws[cell.coordinate].fill = copy(cell.fill)
-                ws[cell.coordinate].alignment = copy(cell.alignment)
-
-        ws["A5"].value = _get_version()
-        ws["A6"].value = _generate_timestamp()
-        ws.column_dimensions['A'].width = 200
-
-class RPMsExporter:
+class KMPReporter:
     def __init__(self):
         self._style = SDCConf()
+    
+    def _summary(self, df):
+        summary = df.copy()
+        for i, row in summary.iterrows(): # we need to do this for unique() since unhashable type: 'dict'.
+            row["vendor"] = row["vendor"]["value"]
 
-    def _summary_symbol_result(self, val):
-        unfound_no = len(val["unfound"])
-        cs_mm_no = len(val["checksum-mismatch"])
-        if unfound_no == 0 and cs_mm_no == 0:
-            return ""
+        def failed_len(col):
+            counter = 0
+            for v in col:
+                if v.get("level") != KMPEvaluation.PASS:
+                    counter+=1
+            return counter
 
-        result = ""
-        if unfound_no > 0:
-            result = f"Number of symbols can not be found in KMP: {unfound_no}"
+        def format_cell(number, total):
+            return f"{number} ({number/total * 100:.2f}%)"
 
-        if cs_mm_no > 0:
-            result = result + f"  Number of symbols checksum does not match: {cs_mm_no}"
-
-        return result
-
-    def _get_sym_check_failed(self, val):
-        result = ""
-        for driver in val:
-            summary = self._summary_symbol_result(val[driver])
-            if summary != "":
-                result = result + "Found {} has below issue(s):\n  {}\n".format(
-                    Path(driver).name, summary
-                )
-
-        return result
-
-    def _get_supported_driver_failed(self, drivers):
-        failed_drivers = []
-        for d in drivers:
-            if drivers[d] != "external":
-                d_name = Path(d).name
-                errDetail = f"value is '{drivers[d]}'"
-                if drivers[d] == "Missing":
-                    errDetail = "no 'supported' flag found"
-                errMsg = f"'supported' flag check failed, {errDetail}"
-                failed_drivers.append(f"{d_name} : {errMsg}")
-
-        return failed_drivers
-
-    def _get_no_signed_driver(self, drivers):
-        results = []
-        for d in drivers:
-            if not drivers[d]:
-                d_name = Path(d).name
-                results.append(f"{d_name} : no signature found")
-
-        return results
-
-    def _get_summary_table(self, rpm_table):
-        df = rpm_table.copy()
-
-        df["sym-check"] = df["sym-check"].astype(str)
-
-        df.loc[df["sym-check"].str.contains("ko"), "sym-check"] = "failed"
-
-        vendors = df["vendor"].unique()
-        df_summary = pd.DataFrame(
-            columns=[
-                "Vendor",
-                "Total KMPs",
-                "License",
-                "Signature",
-                "Weak Module Invoked",
-                "Supported Flag/Signature Checks Failed",
-                "Symbols Check Failed",
-                "Modalias Check Failed", 
-            ]
-        )
-
-        def alias_check(alias):
-            num = 0
-
-            for i in range(len(alias)):
-                if alias.iat[i]["match_all"] or len(alias.iat[i]["unmatched_km_alias"]) > 0 or len(alias.iat[i]["unmatched_kmp_alias"]) > 0:
-                    num += 1
-
-            return num
-
-        def supported_sig_check(rpms_sf, rpms_is):
-            """
-            rpms_sf: RPMs' driver supported flag
-            rpm_is : RPMs' is_signed column
-            """
-            num = 0
-            # rpms_sf and rpms_is have the same drivers.
-            rpms = len(rpms_sf.index)
-            for i in range(rpms):
-                sf_drivers = rpms_sf.iat[i]
-                is_drivers = rpms_is.iat[i]
-                found_issues = False
-                for key in sf_drivers:
-                    if sf_drivers[key] != "external" or not is_drivers[key]:
-                        found_issues = True
-                        break
-                if not found_issues:
-                    num += 1
-
-            return rpms - num
-
-        def license_check(vld_lics, rpm_licenses, driver_license):
-            count = 0
-            for idx, rl in rpm_licenses.items():
-                if ValidLicense(rl, vld_lics):
-                    count += 1
-                else:
-                    d_lics = driver_license[idx]
-                    for dl in d_lics:
-                        if ValidLicense(dl, vld_lics):
-                            count += 1
-                            break
-
-            return count
-
-        vld_lic = self._style.get_valid_licenses()
-
+        vendors = summary["vendor"].unique()
+        sum_table = pd.DataFrame()
         for v in vendors:
-            df_vendor = df.loc[df["vendor"] == v]
-            total = len(df_vendor.index)
-            spc = supported_sig_check(df_vendor["df-supported"], df_vendor["is-signed"])
-            symc = len(
-                df_vendor.loc[df_vendor["sym-check"] == "failed", "sym-check"].index
-            )
-            lic_check = license_check(
-                vld_lic, df_vendor["license"], df_vendor["dv-licenses"]
-            )
-            no_sig = len(
-                df_vendor.loc[
-                    (df_vendor["signature"] != "")
-                    & (df_vendor["signature"] != "(none)"),
-                    "signature",
-                ].index
-            )
-            wm_invoked = len(df_vendor.loc[df_vendor["wm-invoked"], "wm-invoked"].index)
-            aliasc = alias_check(df_vendor["modalias"])
+            vendor_df          = summary.loc[summary["vendor"] == v]
+            total              = len(vendor_df.index)
+            sig_failed         = failed_len(vendor_df["signature"])
+            license_failed     = failed_len(vendor_df["license"])
+            supported_failed   = failed_len(vendor_df["supported_flag"])
+            wm2_invoked_failed = failed_len(vendor_df["wm2_invoked"])
+            km_sigs_failed     = failed_len(vendor_df["km_signatures"])
+            km_license_failed  = failed_len(vendor_df["km_licenses"])
+            symbols_failed     = failed_len(vendor_df["symbols"])
+            alias_failed       = failed_len(vendor_df["modalias"])
 
-            df_summary = df_summary.append(
-                {
-                    "Vendor": v,
-                    "Total KMPs": total,
-                    "License": f"{lic_check} ({lic_check/total * 100:.2f}%)",
-                    "Signature": f"{no_sig} ({no_sig/total * 100:.2f}%)",
-                    "Weak Module Invoked": f"{wm_invoked} ({wm_invoked/total * 100:.2f}%)",
-                    "Supported Flag/Signature Checks Failed": f"{spc} ({spc/total * 100:.2f}%)",
-                    "Symbols Check Failed": f"{symc} ({symc/total * 100:.2f}%)",
-                    "Modalias Check Failed": f"{aliasc} ({aliasc/total * 100:.2f}%)",
-                },
-                ignore_index=True,
-            )
+            new_row = pd.Series({
+                "Vendor"             : v,
+                "Total KMPs"         : total,
+                "License"            : format_cell(license_failed, total),
+                "KMP Signature"      : format_cell(sig_failed, total),
+                "Weak Module Invoked": format_cell(wm2_invoked_failed, total),
+                "Supported Flag"     : format_cell(supported_failed, total),
+                "KM Signatures"      : format_cell(km_sigs_failed, total),
+                "KM Licenses"        : format_cell(km_license_failed, total),
+                "Symbols"            : format_cell(symbols_failed, total),
+                "Modalias"           : format_cell(alias_failed, total),
+            })
 
-        return df_summary
+            sum_table = pd.concat([sum_table, new_row.to_frame().T], ignore_index=True)
+        
+        return sum_table
 
-    def _get_summary_table_html(self, rpm_table):
+    def _summary_to_html(self, df):
         tb = table()
         with tb:
             tb.set_attribute("class", "summary_table")
-            df_summary = self._get_summary_table(rpm_table)
+            summary = self._summary(df)
             with tr():
-                cols = df_summary.columns
+                cols = summary.columns
                 for col in cols:
-                    if col == "vendor":
+                    if col == "Vendor":
                         t = th(col)
                         t.set_attribute("class", "summary_vendor")
                     else:
                         th(col)
-
-                for i, row in df_summary.iterrows():
-                    vendor = row["Vendor"]
-                    total_rpms = row["Total KMPs"]
-                    ssc = row["Supported Flag/Signature Checks Failed"]
-                    lic_check = row["License"]
-                    signature = row["Signature"]
-                    wm_invoked = row["Weak Module Invoked"]
-                    sym_failed = row["Symbols Check Failed"]
-                    alias_failed = row["Modalias Check Failed"]
-
-                    row_passed = False
-                    if (
-                        vendor != ""
-                        and int(ssc.split(" ")[0]) == 0
-                        and int(lic_check.split(" ")[0]) == total_rpms
-                        and int(signature.split(" ")[0]) == total_rpms
-                        and int(wm_invoked.split(" ")[0]) == total_rpms
-                        and int(sym_failed.split(" ")[0]) == 0
-                        and int(alias_failed.split(" ")[0]) == 0
-                    ):
-                        row_passed = True
-                    with tr() as r:
-                        if row_passed:
-                            r.set_attribute("class", "summary_great_row")
-                        if vendor != "":
-                            td(vendor)
+            
+            def _pass(item):
+                return int(item.split(" ")[0]) == 0
+            
+            for i, row in summary.iterrows():
+                vendor = row["Vendor"]
+                total = row["Total KMPs"]
+                sig = row["KMP Signature"]
+                license = row["License"]
+                supported = row["Supported Flag"]
+                wm2_invoked = row["Weak Module Invoked"]
+                km_sigs = row["KM Signatures"]
+                km_license = row["KM Licenses"]
+                symbols = row["Symbols"]
+                alias = row["Modalias"]
+                
+                row_passed = False
+                if (
+                    vendor != ""
+                    and _pass(sig)
+                    and _pass(license)
+                    and _pass(supported)
+                    and _pass(wm2_invoked)
+                    and _pass(km_sigs)
+                    and _pass(km_license)
+                    and _pass(symbols)
+                    and _pass(alias)
+                ):
+                    row_passed = True
+                with tr() as r:
+                    if row_passed:
+                        r.set_attribute("class", "summary_great_row")
+                    if vendor != "":
+                        td(vendor)
+                    else:
+                        tv = td("no vendor information")
+                        tv.set_attribute("class", "important_failed")
+                    with td(total) as t:
+                        t.set_attribute("class", "summary_total")
+                    with td(license) as t:
+                        if _pass(license):
+                            t.set_attribute("class", "summary_number")
                         else:
-                            tv = td("no vendor information")
-                            tv.set_attribute("class", "important_failed")
-                        with td(total_rpms) as t:
-                            t.set_attribute("class", "summary_total")
-                        with td(lic_check) as t:
-                            if int(lic_check.split(" ")[0]) != total_rpms:
-                                t.set_attribute(
-                                    "class", "important_failed summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
-                        with td(signature) as t:
-                            if int(signature.split(" ")[0]) != total_rpms:
-                                t.set_attribute(
-                                    "class", "important_failed summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
-                        with td(wm_invoked) as t:
-                            if int(wm_invoked.split(" ")[0]) != total_rpms:
-                                t.set_attribute(
-                                    "class", "critical_failed summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
-                        with td(ssc) as t:
-                            if int(ssc.split(" ")[0]) != 0:
-                                t.set_attribute(
-                                    "class", "critical_failed summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
-                        with td(sym_failed) as t:
-                            if int(sym_failed.split(" ")[0]) != 0:
-                                t.set_attribute(
-                                    "class", "critical_failed summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
-                        with td(alias_failed) as t:
-                            if int(alias_failed.split(" ")[0]) > 0:
-                                t.set_attribute(
-                                    "class", "important_falied summary_number"
-                                )
-                            else:
-                                t.set_attribute("class", "summary_number")
+                            t.set_attribute("class", "important_failed summary_number")
+                    with td(sig) as t:
+                        if _pass(sig):
+                            t.set_attribute("class", "summary_number")
+                        else:
+                            t.set_attribute("class", "important_failed summary_number")
+                    with td(wm2_invoked) as t:
+                        if _pass(wm2_invoked):
+                            t.set_attribute("class", "summary_number")
+                        else:
+                            t.set_attribute("class", "critical_failed summary_number")
+                    with td(supported) as t:
+                        if _pass(supported):
+                            t.set_attribute("class", "summary_number")
+                        else:
+                            t.set_attribute("class", "critical_failed summary_number")
+                    with td(km_sigs) as t:
+                        if _pass(km_sigs):
+                            t.set_attribute("class", "summary_number")
+                        else:
+                            t.set_attribute("class", "important_failed summary_number")
+                    with td(km_license) as t:
+                        if _pass(km_license):
+                            t.set_attribute("class", "summary_number")
+                        else:
+                            t.set_attribute("class", "important_failed summary_number")
+                    with td(symbols) as t:
+                        if _pass(symbols):
+                            t.set_attribute("class", "summary_number")
+                        else:
+                            t.set_attribute("class", "critical_failed summary_number")
+                    with td(alias) as t:
+                        if _pass(alias):
+                            t.set_attribute("class", "summary_number")
+                        else:
+                            t.set_attribute("class", "critical_failed summary_number")
 
         return tb
+
+    def _detail_to_html(self, df):
+        def _create_cell(ana_val):
+            level, value = ana_val.get("level"), ana_val.get("value")
+            if value == None:
+                value = ""
+
+            if level == KMPEvaluation.PASS:
+                return td(value)
+            elif level == KMPEvaluation.WARNING:
+                return td(value).set_attribute("class", "important_failed")
+            elif level == KMPEvaluation.ERROR:
+                return td(value).set_attribute("class", "critical_failed")
+
+        tb = table()
+        with tb:
+            tb.set_attribute("class", "table_center")
+            with tr():
+                th("KMP Checks", colspan=6).set_attribute("class", f"detail_rpm")
+                th("Kernel Module Checks", colspan=5).set_attribute("class", f"detail_kernel_module")
+            with tr():
+                th("Name").set_attribute("class", f"detail_0")
+                th("Path").set_attribute("class", f"detail_1")
+                th("Vendor").set_attribute("class", f"detail_2")
+                th(raw("Signature<span class=\"tooltiptext\">Only check there's a signature or not.</span>")).set_attribute("class", f"detail_3 tooltip")
+                th(raw("License<span class=\"tooltiptext\">KMP and it's kernel modules should use open source licenses.</span>")).set_attribute("class", f"detail_4 tooltip")
+                th(raw("Weak Module Invoked<span class=\"tooltiptext\">Weak Module is necessary to make 3rd party kernel modules installed for one kernel available to KABI-compatible kernels. </span>")).set_attribute("class", f"detail_5 tooltip")
+                th(raw("Licenses<span class=\"tooltiptext\">KMP and it's kernel modules should use open source licenses.</span>")).set_attribute("class", f"detail_6 tooltip")
+                th(raw("Signatures<span class=\"tooltiptext\">\"supported\" flag: <br/>  \"yes\": Only supported by SUSE<br/>  \"external\": supported by both SUSE and vendor</span>")).set_attribute("class", f"detail_6 tooltip")
+                th(raw("Supported Flag<span class=\"tooltiptext\">\"supported\" flag: <br/>  \"yes\": Only supported by SUSE<br/>  \"external\": supported by both SUSE and vendor</span>")).set_attribute("class", f"detail_6 tooltip")
+                th(raw("Symbols<span class=\"tooltiptext\">Symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
+                th(raw("Modalias<span class=\"tooltiptext\">Modalias check is to check whether the modalias in kernel modules matches the modalias in its package.</span>")).set_attribute("class", f"detail_8 tooltip")
+
+            for i, row in df.iterrows():
+                with tr() as r:
+                    if row["level"] == KMPEvaluation.WARNING:
+                        r.set_attribute("class", "important_failed_row")
+                    elif row["level"] == KMPEvaluation.ERROR:
+                        r.set_attribute("class", "critical_failed_row")
+                
+                    _create_cell(row["name"])
+                    _create_cell(row["path"])
+                    _create_cell(row["vendor"])
+                    _create_cell(row["signature"])
+                    _create_cell(row["license"])
+                    _create_cell(row["wm2_invoked"])
+                    _create_cell(row["km_licenses"])
+                    _create_cell(row["km_signatures"])
+                    _create_cell(row["supported_flag"])
+                    _create_cell(row["symbols"])
+                    _create_cell(row["modalias"])
+        
+        return tb
+    
+    def to_html(self, df, file):
+        pkg_path = os.path.dirname(__file__)
+        jinja_tmpl = f"{pkg_path}/../config/templates"
+        file_loader = FileSystemLoader(jinja_tmpl)
+        env = Environment(loader=file_loader)
+
+        kmp_tmpl = env.get_template("kmp-checks.html.jinja")
+
+        kmp_checks = kmp_tmpl.render(version=get_version(), timestamp=generate_timestamp(),
+            summary_table=self._summary_to_html(df),
+            rpm_details=self._detail_to_html(df),
+        )
+
+        with open(file, "w") as f:
+            f.write(kmp_checks)
+    
+    def to_xlsx(self, df):
+        pass
+    
+    def to_json(self, df, file):
+        df.to_json(file, orient="records")
+    
+    def to_pdf(self, df):
+        pass
+
+class RPMsExporter:
+    def __init__(self):
+        self._style = SDCConf()
 
     def _rename_rpm_detail_columns(self, rpm_table):
         df = rpm_table.copy()

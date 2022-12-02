@@ -12,7 +12,6 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from .version import __VERSION__
 
 
-QUERY_TYPES = ["suse", "other", "unknown", "all"]
 FORMAT_TYPES = {
     "html": ".html",
     "excel": ".xlsx",
@@ -117,18 +116,6 @@ def dst_is_ok(dst, out_format):
     help="Specify output format (PDF is in Beta)",
 )
 @click.option(
-    "--query",
-    "-q",
-    type=click.Choice(QUERY_TYPES),
-    default="all",
-    help="Filter results based on vendor tag "
-    "from rpm package providing module. "
-    '"suse" = SUSE, '
-    '"other" = other vendors, '
-    '"unknown" = vendor is unknown, '
-    '"all" = show all (default)',
-)
-@click.option(
     "--output",
     "-o",
     default=".",
@@ -142,7 +129,7 @@ def dst_is_ok(dst, out_format):
     "be automatically appended matching on the output format",
 )
 @click.option("--version", is_flag=True)
-def run(check_target, output, out_format, query, version):
+def run(check_target, output, out_format, version):
     """Run checks against CHECK_TARGET.
 
     \b
@@ -167,8 +154,6 @@ def run(check_target, output, out_format, query, version):
 
     target = Check_Target(check_target)
 
-    query = query.lower()
-
     dst = Path(output)
     if dst.is_dir() or output.endswith("/"):
         dst = dst / "check_result"
@@ -190,8 +175,8 @@ def run(check_target, output, out_format, query, version):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
         with progress:
-            rpmCheck = data_reader.RPMReader(progress)
-            check_result = rpmCheck.get_rpm_info(target.rpm)
+            rpm_check = data_reader.KMPProcessor(data_reader.KMPTerminalOutput(progress))
+            check_result = rpm_check.process_kmp(target.rpm)
 
     elif target.dir:
         progress = Progress(
@@ -201,10 +186,11 @@ def run(check_target, output, out_format, query, version):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
         with progress:
-            rpmCheck = data_reader.RPMReader(progress)
-            check_result = rpmCheck.get_rpms_info(path=target.dir, query=query)
-        exporter = data_exporter.RPMsExporter()
-        export(exporter, check_result, out_format, dst)
+            kmp_processor = data_reader.KMPProcessor(data_reader.KMPTerminalOutput(progress))
+            data = kmp_processor.process_kmps(target.dir)
+        reporter = data_exporter.KMPReporter()
+        df = data_exporter.to_dataframe(data)
+        export(reporter, df, out_format, dst)
         logger.info(
             "[green]Check is completed![/]"
             "The result has been saved to "
