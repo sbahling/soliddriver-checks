@@ -117,7 +117,7 @@ class KMPReporter:
             def _pass(item):
                 return int(item.split(" ")[0]) == 0
             
-            for i, row in summary.iterrows():
+            for __, row in summary.iterrows():
                 vendor = row["Vendor"]
                 total = row["Total KMPs"]
                 sig = row["KMP Signature"]
@@ -227,7 +227,7 @@ class KMPReporter:
                 th(raw("Symbols<span class=\"tooltiptext\">Symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
                 th(raw("Modalias<span class=\"tooltiptext\">Modalias check is to check whether the modalias in kernel modules matches the modalias in its package.</span>")).set_attribute("class", f"detail_8 tooltip")
 
-            for i, row in df.iterrows():
+            for __, row in df.iterrows():
                 with tr() as r:
                     if row["level"] == KMPEvaluation.WARNING:
                         r.set_attribute("class", "important_failed_row")

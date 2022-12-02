@@ -190,7 +190,6 @@ class KMPAnalysis:
             ana_level.append(eval.value)    
 
         eval, alaias_msg = self._kms_modalias_analysis(kmp_modalias, km_info)
-        km_analysis[km_path]["alias"] = {"level": eval, "value": alaias_msg}
         ana_level.append(eval.value)
 
         ana_summary = {"license"  : self._kmp_km_ana_summary(km_analysis, "license"),
@@ -277,7 +276,7 @@ class KMPAnalysis:
 
     def _km_signature_analysis(self, signature):
         if str(signature) != "":
-            return KMPEvaluation.PASS, ""
+            return KMPEvaluation.PASS, "Exist"
         
         return KMPEvaluation.ERROR, "No signature found"        
 
@@ -362,7 +361,7 @@ class KMPReader:
 
         if len(kms) < 1:
             tmp.cleanup()
-            return None
+            return result
 
         for km in kms:
             item = dict()
@@ -383,20 +382,22 @@ class KMPReader:
     def _check_kmp_manifest(self, cmd_output):
         lines = cmd_output.splitlines()
         
-        if len(lines) < 1:
-            return False, []
+        if len(lines) < 1: # no output also means good.
+            return True, []
 
         items = lines[0].split(":")
         if len(items) < 3:  # example: error: ./tmp/a.rpm: not an rpm package (or package manifest)
             return True, []
         
         if items[0].strip() == "error":
-             False, items
+             return False, items
+
+        return True, []
 
     def _get_kmp_modalias(self, path):
         cmd = "".join("rpm -q --nosignature --supplements %s" % path)
         supplements = run_cmd(cmd)
-        
+
         success, err_info = self._check_kmp_manifest(supplements)
         if not success:
             print(err_info)
