@@ -1,5 +1,4 @@
 from sqlite3 import Timestamp
-import pdfkit
 import pandas as pd
 import os
 from pathlib import Path
@@ -25,30 +24,8 @@ from jinja2 import Environment, FileSystemLoader
 import re
 from copy import copy
 from ..config import SDCConf, ExcelTemplate, get_version, generate_timestamp
-from .data_reader import KMPEvaluation
+from .data_analysis import KMPEvaluation
 
-
-def to_dataframe(data):
-    df = pd.DataFrame()
-
-    for item in data:
-        new_row = pd.Series({
-            "level"           : item["level"],
-            "name"            : item["name"],
-            "path"            : item["path"],
-            "vendor"          : item["vendor"],
-            "signature"       : item["signature"],
-            "license"         : item["license"],
-            "wm2_invoked"     : item["wm2_invoked"],
-            "supported_flag"  : item["km"]["supported"],
-            "km_signatures"   : item["km"]["signature"],
-            "km_licenses"     : item["km"]["license"],
-            "symbols"         : item["km"]["symbols"],
-            "modalias"        : item["km"]["alias"]
-            })
-        df = pd.concat([df, new_row.to_frame().T], ignore_index=True)
-
-    return df
 
 class KMPReporter:
     def __init__(self):
@@ -264,6 +241,12 @@ class KMPReporter:
         with open(file, "w") as f:
             f.write(kmp_checks)
     
+    def _summary_to_xlsx(self, df):
+        pass
+    
+    def _detail_to_xlsx(self, df):
+        pass
+    
     def to_xlsx(self, df):
         pass
     
@@ -276,198 +259,6 @@ class KMPReporter:
 class RPMsExporter:
     def __init__(self):
         self._style = SDCConf()
-
-    def _rename_rpm_detail_columns(self, rpm_table):
-        df = rpm_table.copy()
-        df = df.rename(
-            columns={
-                "name": "Name",
-                "path": "Path",
-                "vendor": "Vendor",
-                "signature": "Signature",
-                "license": "License",
-                "wm-invoked": "Weak Module Invoked",
-                "df-supported": "Supported Flag Check",
-                "sym-check": "Symbols Check",
-                "modalias": "Modalias Check",
-                "dv-licenses": "Driver Licenses",
-                "is-signed": "is-signed",
-            }
-        )
-
-        return df
-
-    def _fmt_driver_license_check(self, rpm_license, driver_licenses, vld_lics):
-        chk_result = ""
-        if not ValidLicense(rpm_license, vld_lics):
-            chk_result = f"RPM license doesn't supported: {rpm_license}"
-            return chk_result
-
-        un_supported_driver = dict()
-        for key in driver_licenses:
-            if not ValidLicense(driver_licenses[key], vld_lics):
-                un_supported_driver[key] = driver_licenses[key]
-
-        if len(un_supported_driver) == 0:
-            return chk_result
-        else:
-            chk_result = "Driver licenses are not supported!\n"
-            for idx, key in enumerate(un_supported_driver):
-                if idx > 2:  # only show 3 result is enough, keep the table clear.
-                    chk_result = f"{chk_result} ..."
-                    break
-                chk_result = (
-                    f"{chk_result} {Path(key).name} : {un_supported_driver[key]}\n"
-                )
-
-        return chk_result
-    
-    def _fmt_modalias_check(self, alias):
-        match_all = alias["match_all"]
-        km_unmatched = len(alias["unmatched_km_alias"])
-        kmp_unmatched = len(alias["unmatched_kmp_alias"])
-        
-        if match_all:
-            return "KMP can match all the devices! Highly not recommended!"
-        
-        message = ""
-        
-        if km_unmatched > 0:
-            message += "Alias found in kernel module but no match in it's package: "
-            for kmu in alias["unmatched_km_alias"]:
-                message += kmu + ", "
-            message += "\n"
-        
-        if kmp_unmatched > 0:
-            message += "Alias found in the package but no match in it's kernel module: "
-            for kmpu in alias["unmatched_kmp_alias"]:
-                message += kmpu + ", "
-        
-        return message
-        
-
-    def _get_table_detail_html(self, rpm_table):
-        df = self._rename_rpm_detail_columns(rpm_table)
-        tb = table()
-        vld_lic = self._style.get_valid_licenses()
-        with tb:
-            tb.set_attribute("class", "table_center")
-            with tr():
-                th("KMP Checks", colspan=6).set_attribute("class", f"detail_rpm")
-                th("Kernel Module Checks", colspan=3).set_attribute("class", f"detail_kernel_module")
-            with tr():
-                th("Name").set_attribute("class", f"detail_0")
-                th("Path").set_attribute("class", f"detail_1")
-                th("Vendor").set_attribute("class", f"detail_2")
-                th(raw("Signature<span class=\"tooltiptext\">Only check there's a signature or not.</span>")).set_attribute("class", f"detail_3 tooltip")
-                th(raw("License<span class=\"tooltiptext\">KMP and it's kernel modules should use open source licenses.</span>")).set_attribute("class", f"detail_4 tooltip")
-                th(raw("Weak Module Invoked<span class=\"tooltiptext\">Weak Module is necessary to make 3rd party kernel modules installed for one kernel available to KABI-compatible kernels. </span>")).set_attribute("class", f"detail_5 tooltip")
-                th(raw("Supported Flag/Signature<span class=\"tooltiptext\">\"supported\" flag: <br/>  \"yes\": Only supported by SUSE<br/>  \"external\": supported by both SUSE and vendor</span>")).set_attribute("class", f"detail_6 tooltip")
-                th(raw("Symbols<span class=\"tooltiptext\">Symbols check is to check whether the symbols in kernel modules matches the symbols in its package.</span>")).set_attribute("class", f"detail_7 tooltip")
-                th(raw("Modalias<span class=\"tooltiptext\">Modalias check is to check whether the modalias in kernel modules matches the modalias in its package.</span>")).set_attribute("class", f"detail_8 tooltip")
-
-            for i, row in df.iterrows():
-                with tr() as r:
-                    name = row["Name"]
-                    path = row["Path"]
-                    vendor = row["Vendor"]
-                    signature = row["Signature"]
-                    # distribution = row["Distribution"]
-                    license = row["License"]
-                    wm_invoked = row["Weak Module Invoked"]
-                    sym_check = self._get_sym_check_failed(
-                        row["Symbols Check"]
-                    ).replace("\n", "</br>")
-                    supported = row["Supported Flag Check"]
-                    is_signed = row["is-signed"]
-                    alias = row["Modalias Check"]
-                    alias_chk = self._fmt_modalias_check(alias)
-                    dc_err = self._supported_sig_errs(supported, is_signed)
-                    dv_license = row["Driver Licenses"]
-                    lcs_chk = self._fmt_driver_license_check(
-                        license, dv_license, vld_lic
-                    )
-                    lcs_chk.replace("\n", "</br>")
-                    if len(dc_err) > 0:
-                        r.set_attribute("class", "critical_failed_row")
-                    td(name)
-                    td(path)
-                    if vendor != "":  # vendor check
-                        td(vendor)
-                    else:
-                        tv = td("no vendor information")
-                        tv.set_attribute("class", "important_failed")
-                        r.set_attribute("class", "important_failed_row")
-                    if signature != "" and signature != "(none)":  # signature check
-                        td(signature)
-                    else:
-                        ts = td(signature)
-                        ts.set_attribute("class", "important_failed")
-                    if lcs_chk == "":  # license check
-                        if license == "":
-                            tl = td("No License")
-                            tl.set_attribute("class", "important_failed")
-                            r.set_attribute("class", "important_failed_row")
-                        elif ValidLicense(license, vld_lic):
-                            td(license)
-                        else:
-                            tl = td(license)
-                            tl.set_attribute("class", "important_failed")
-                            r.set_attribute("class", "important_failed_row")
-                    else:
-                        tl = td(raw(lcs_chk))
-                        tl.set_attribute("class", "important_failed")
-                        r.set_attribute("class", "important_failed_row")
-                    if wm_invoked or "debuginfo" in name:  # wm check
-                        td(str(wm_invoked))
-                    else:
-                        tw = td(str(wm_invoked))
-                        tw.set_attribute("class", "critical_failed")
-                        r.set_attribute("class", "critical_failed_row")
-                    if len(dc_err) > 0:  # driver check.
-                        t_w = td(raw("</br>".join(dc_err)))
-                        t_w.set_attribute("class", "critical_failed")
-                    else:
-                        t = td("All passed!")
-                        t.set_attribute("class", "detail_pass")
-                    if sym_check == "":  # symbol check.
-                        t = td("All passed!")
-                        t.set_attribute("class", "detail_pass")
-                    else:
-                        t_w = td(raw(sym_check))
-                        t_w.set_attribute("class", "critical_failed")
-                        r.set_attribute("class", "critical_failed_row")
-                    if alias_chk == "":
-                        t = td("All passed!")
-                        t.set_attribute("class", "detail_pass")
-                    else:
-                        t_w = td(raw(alias_chk.replace("\n", "</br>")))
-                        t_w.set_attribute("class", "important_failed")
-                        r.set_attribute("class", "important_failed_row")
-
-        return tb
-
-    def _supported_sig_errs(self, sffds, nsds):
-        sfds_l = self._get_supported_driver_failed(sffds)
-        nsds_l = self._get_no_signed_driver(nsds)
-
-        return sfds_l + nsds_l
-
-    def to_html(self, rpm_table, file):
-        pkg_path = os.path.dirname(__file__)
-        jinja_tmpl = f"{pkg_path}/../config/templates"
-        file_loader = FileSystemLoader(jinja_tmpl)
-        env = Environment(loader=file_loader)
-
-        rpm_tmpl = env.get_template("kmp-checks.html.jinja")
-
-        rpm_checks = rpm_tmpl.render(version=_get_version(), timestamp=_generate_timestamp(),
-            summary_table=self._get_summary_table_html(rpm_table),
-            rpm_details=self._get_table_detail_html(rpm_table),
-        )
-
-        with open(file, "w") as f:
-            f.write(rpm_checks)
 
     def to_json(self, rpm_table, file):
         rpm_table.to_json(file, orient="records")

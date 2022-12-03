@@ -3,6 +3,8 @@ import json
 from .utils import remote_check
 from .utils import data_exporter
 from .utils import data_reader
+from .utils import data_analysis
+from .utils import terminal_logs
 import os
 import logging
 import socket
@@ -175,7 +177,7 @@ def run(check_target, output, out_format, version):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
         with progress:
-            rpm_check = data_reader.KMPProcessor(data_reader.KMPTerminalOutput(progress))
+            rpm_check = terminal_logs.KMPProcessor(terminal_logs.KMPTerminalOutput(progress))
             check_result = rpm_check.process_kmp(target.rpm)
 
     elif target.dir:
@@ -186,10 +188,10 @@ def run(check_target, output, out_format, version):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
         with progress:
-            kmp_processor = data_reader.KMPProcessor(data_reader.KMPTerminalOutput(progress))
+            kmp_processor = terminal_logs.KMPProcessor(terminal_logs.KMPTerminalOutput(progress))
             data = kmp_processor.process_kmps(target.dir)
         reporter = data_exporter.KMPReporter()
-        df = data_exporter.to_dataframe(data)
+        df = data_analysis.kmps_to_dataframe(data)
         export(reporter, df, out_format, dst)
         logger.info(
             "[green]Check is completed![/]"
