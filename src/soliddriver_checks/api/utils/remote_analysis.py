@@ -1,4 +1,3 @@
-from .reader import DriverReader
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from concurrent.futures import ThreadPoolExecutor
 

@@ -12,6 +12,7 @@ import json
 from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 from ..config import SDCConf
 from enum import Enum, unique
+from .utils.cmd import run_cmd
 
 def get_cmd_all_drivers_modinfo():
     return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\|ko.zst\)$") 2>&1'
@@ -45,10 +46,10 @@ def analysis_kmps_to_dataframe(data):
         "signature"       : item["signature"],
         "license"         : item["license"],
         "wm2_invoked"     : item["wm2_invoked"],
-        "supported_flag"  : item["km_info"]["supported"],
-        "km_signatures"   : item["km_info"]["signature"],
-        "km_licenses"     : item["km_info"]["license"],
-        "symbols"         : item["km_info"]["symbols"],
+        "supported_flag"  : item["km"]["supported"],
+        "km_signatures"   : item["km"]["signature"],
+        "km_licenses"     : item["km"]["license"],
+        "symbols"         : item["km"]["symbols"],
         "modalias"        : item["km"]["alias"]
         })
         df = pd.concat([df, new_row.to_frame().T], ignore_index=True)

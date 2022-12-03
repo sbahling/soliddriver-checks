@@ -230,7 +230,7 @@ class KMPReporter:
         file_loader = FileSystemLoader(jinja_tmpl)
         env = Environment(loader=file_loader)
 
-        kmp_tmpl = env.get_template("kmp-checks.html.jinja")
+        kmp_tmpl = env.get_template("kmp-report.html.jinja")
 
         kmp_checks = kmp_tmpl.render(version=get_version(), timestamp=generate_timestamp(),
             summary_table=self._summary_to_html(df),

@@ -2,18 +2,15 @@ import click
 import json
 from ..api import analysis
 from .terminal_logs import KMPTerminalOutput
-from .utils import remote_check
+from ..api.utils.remote_analysis import check_remote_servers
 from .kmp_report import KMPReporter
-from .utils import data_reader
-from .utils import data_analysis
-from .utils import terminal_logs
 import os
 import logging
 import socket
 from pathlib import Path
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from .version import __VERSION__
+from ..version import __VERSION__
 
 
 FORMAT_TYPES = {
@@ -237,7 +234,7 @@ def run(check_target, output, out_format, version):
 
     elif target.config is not None:
         servers = target.config["servers"]
-        check_result = remote_check.check_remote_servers(logger, servers)
+        check_result = check_remote_servers(logger, servers)
         exporter = data_exporter.DriversExporter()
         export(exporter, check_result, out_format, dst)
         logger.info(
