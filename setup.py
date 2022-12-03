@@ -27,7 +27,7 @@ setup(
     version=get_version("src/soliddriver_checks/version.py"),
     author="Hui-Zhi Zhao",
     author_email="hui.zhi.zhao@suse.com",
-    description=("Check RPMs and Drivers information"),
+    description=("Check Kernel Module Package and Kernel Module information"),
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/SUSE/soliddriver-checks",
@@ -54,7 +54,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'soliddriver-checks=soliddriver_checks.cli:run'
+            'soliddriver-checks=soliddriver_checks.cli.cli:run'
         ]
     },
 )

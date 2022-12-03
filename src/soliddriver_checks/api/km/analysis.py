@@ -6,7 +6,7 @@ from enum import Enum, unique
 from ..config import SDCConf
 
 
-def kmps_to_dataframe(data):
+def kms_to_dataframe(data):
     df = pd.DataFrame()
 
     for item in data:
@@ -30,12 +30,12 @@ def kmps_to_dataframe(data):
 
 
 @unique
-class KMPEvaluation (Enum):
+class KMEvaluation (Enum):
     PASS = 1
     WARNING = 2
     ERROR = 3
 
-class KMPAnalysis:
+class KMAnalysis:
     def __init__(self):
         conf = SDCConf()
         self._valid_licenses = conf.get_valid_licenses()

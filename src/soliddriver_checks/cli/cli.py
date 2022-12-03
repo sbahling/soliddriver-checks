@@ -1,7 +1,9 @@
 import click
 import json
+from ..api import analysis
+from .terminal_logs import KMPTerminalOutput
 from .utils import remote_check
-from .utils import data_exporter
+from .kmp_report import KMPReporter
 from .utils import data_reader
 from .utils import data_analysis
 from .utils import terminal_logs
@@ -188,10 +190,9 @@ def run(check_target, output, out_format, version):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
         with progress:
-            kmp_processor = terminal_logs.KMPProcessor(terminal_logs.KMPTerminalOutput(progress))
-            data = kmp_processor.process_kmps(target.dir)
-        reporter = data_exporter.KMPReporter()
-        df = data_analysis.kmps_to_dataframe(data)
+            log = KMPTerminalOutput(progress)
+            df = analysis.kmps_to_dataframe(target.dir, log)
+        reporter = KMPReporter()
         export(reporter, df, out_format, dst)
         logger.info(
             "[green]Check is completed![/]"

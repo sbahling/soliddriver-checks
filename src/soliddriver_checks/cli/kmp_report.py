@@ -24,8 +24,7 @@ from jinja2 import Environment, FileSystemLoader
 import re
 from copy import copy
 from ..config import SDCConf, ExcelTemplate, get_version, generate_timestamp
-from .data_analysis import KMPEvaluation
-
+from ..api.kmp import KMPEvaluation
 
 class KMPReporter:
     def __init__(self):
