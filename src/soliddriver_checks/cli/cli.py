@@ -4,6 +4,7 @@ from ..api import analysis
 from .terminal_logs import KMPTerminalOutput
 from ..api.utils.remote_analysis import check_remote_servers
 from .kmp_report import KMPReporter
+from .km_report import KMReporter
 import os
 import logging
 import socket
@@ -208,29 +209,9 @@ def run(check_target, output, out_format, version):
             ip = "127.0.0.1"
         label = "%s (%s)" % (hostname, ip)
         logger.info("Retrieving kernel module data for %s" % label)
-        progress = Progress(
-            "{task.description}",
-            SpinnerColumn(),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        )
-        with progress:
-            driverCheck = data_reader.DriverReader(progress)
-            drivers, wu_drivers, noinfo_drivers = driverCheck.get_local_drivers(query)
-            check_result = {
-                label: {
-                    "drivers": drivers,
-                    "weak-update-drivers": wu_drivers,
-                    "noinfo-drivers": noinfo_drivers,
-                }
-            }
-        exporter = data_exporter.DriversExporter()
-        export(exporter, check_result, out_format, dst)
-        progress.console.print(
-            "[green]Check is completed![/]"
-            "The result has been saved to "
-            "[bold green]%s[/]" % dst
-        )
+        kms = analysis.kms_to_dataframe()
+        reporter = KMReporter()
+        export(reporter, kms, out_format, dst)
 
     elif target.config is not None:
         servers = target.config["servers"]
