@@ -25,20 +25,21 @@ import re
 from copy import copy
 from ..config import SDCConf, ExcelTemplate, get_version, generate_timestamp
 from ..api.kmp import KMPEvaluation
-from ..api.analysis import kms_to_dataframe
+from ..api.analysis import kms_to_dataframe, kms_to_json
 
 class KMReporter:
     def __init__(self):
         self._style = SDCConf()
         
-    def to_html(self, filename):
+    def to_html(self, df, filename):
         pass
     
-    def to_excel(self, filename):
+    def to_excel(self, df, filename):
         pass
     
-    def to_json(self, filename):
-        buffer = kms_to_dataframe()
+    def to_json(self, buffer, filename):
+        if buffer is None or buffer == "":
+            buffer = kms_to_json()
         
         with open(filename, "w") as fp:
             json.dump(buffer, fp)

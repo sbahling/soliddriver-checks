@@ -42,7 +42,7 @@ class KMAnalysis:
             row_level.append(lev_sig.value)
             lev_r, running = self._km_running_analysis(kms[filename].get("running", ""))
             row_level.append(lev_r.value)
-            lev_kmp, kmp = self._km_kmp_analysis(kms[filename].get("kmp", ""))
+            lev_kmp, kmp = self._km_kmp_analysis(kms[filename].get("kmp", None))
             
             row = pd.Series({
                              "level": KMEvaluation(max(row_level)),
@@ -104,6 +104,9 @@ class KMAnalysis:
         return KMEvaluation.PASS, running
     
     def _km_kmp_analysis(self, kmp):
+        if None == kmp:
+            return KMEvaluation.PASS, {"name": "", "signature": ""} 
+
         name = kmp["name"]
         signature = kmp["signature"]
         
@@ -116,17 +119,33 @@ class KMAnalysis:
 
 
 class KMReader:
+    # resolve OSError: [Errno 7] Argument list too long: '/bin/sh'
+    def _split_cmd_args(self, files, cmd):
+        files_no = len(files)
+        output = ""
+        for i in range(0, files_no, 300):
+            curr_slip = 300
+            if i + 300 > files_no:
+                curr_slip = files_no - i
+            str_files = "\n".join(files[i:i+curr_slip])
+            output += run_cmd(cmd % str_files)
+
+        return output
+
     def get_all_modinfo(self):
         running_kms = run_cmd("/usr/sbin/modinfo $(cat /proc/modules | awk '{print $1}') | grep filename | awk '{print$2}'").splitlines()
-        lm_kms = run_cmd("find /lib/modules/ -regex \".*\.\(ko\|ko.xz\|ko.zst\)$\"")
+        lm_kms = run_cmd("find /lib/modules/ -regex \".*\.\(ko\|ko.xz\|ko.zst\)$\"").splitlines()
         
-        files = set(running_kms + lm_kms)
-        kms_info = run_cmd(f'/usr/sbin/modinfo {" ".join(files)} | grep -E "^([a-z]|[A-Z])" 2>&1').split("filename:") # we don't need the entire signature, so add grep to ignore the details in other lines.
+        files = list(set(running_kms + lm_kms))
+        # we don't need the entire signature, so add grep to ignore the details in other lines.
+        kms_info = self._split_cmd_args(files, '/usr/sbin/modinfo %s | grep -E "^([a-z]|[A-Z])" 2>&1')
+        kms_info = kms_info.split("filename:")
         if len(kms_info) == 0:
             return {}
         
         kms = {}
-        kmps = run_cmd(f'rpm -qf {" ".join(files)}').splitlines()
+        kmps = self._split_cmd_args(files, 'rpm -qf %s')
+        kmps = kmps.splitlines()
         kmps_sig_pair = self._get_kmps_signature(kmps)
         # Here's something needs to be take care of if you split all the modinfo output by "filename",
         # If the kernel module is an invalid link, the output is:
@@ -164,7 +183,7 @@ class KMReader:
 
     def _check_weak_links(self, kms):
         pkg_path = os.path.dirname(__file__)
-        script = f"{pkg_path}/api/utils/scripts/check-links.sh"
+        script = f"{pkg_path}/utils/scripts/check-links.sh"
         j_links = run_cmd(script)
         links = json.loads(j_links)
         for km in links["weak-updates"]:
@@ -181,10 +200,11 @@ class KMReader:
         for ik in invalid_kmps:
             uniq_kmps.remove(ik)
         
-        signatures = run_cmd(f'rpm -q --info {uniq_kmps} | grep -E "^Signature').splitlines() # example: Signature   : RSA/SHA256, Wed 12 Oct 2022 06:57:49 PM CST, Key ID 70af9e8139db7c82
+        signatures = run_cmd(f'rpm -q --info {" ".join(uniq_kmps)} | grep -E "^Signature"').splitlines() # example: Signature   : RSA/SHA256, Wed 12 Oct 2022 06:57:49 PM CST, Key ID 70af9e8139db7c82
         
         kmp_sig_pairs = {}
-        for i in len(uniq_kmps):
+        uniq_kmps = list(uniq_kmps)
+        for i in range(0, len(uniq_kmps)):
             kmp_sig_pairs[uniq_kmps[i]] = signatures[i].split(":")[1:]
         
         return kmp_sig_pairs

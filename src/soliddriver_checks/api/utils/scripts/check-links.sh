@@ -6,6 +6,7 @@
 # -- value: 1, pass
 # -- value: 2, kernel module does not exist
 # -- value: 3, kernel module under weak-updates should be a link, but it's a file!
+
 files=$(find /lib/modules/*/weak-updates/ -regex ".*\.\(ko\|ko.xz\)$")
 
 result="{\"weak-updates\":["

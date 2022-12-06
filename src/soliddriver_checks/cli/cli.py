@@ -209,9 +209,8 @@ def run(check_target, output, out_format, version):
             ip = "127.0.0.1"
         label = "%s (%s)" % (hostname, ip)
         logger.info("Retrieving kernel module data for %s" % label)
-        kms = analysis.kms_to_dataframe()
         reporter = KMReporter()
-        export(reporter, kms, out_format, dst)
+        export(reporter, None, out_format, dst)
 
     elif target.config is not None:
         servers = target.config["servers"]
