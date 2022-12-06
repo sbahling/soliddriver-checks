@@ -123,17 +123,21 @@ class KMReader:
     def _split_cmd_args(self, files, cmd):
         files_no = len(files)
         output = ""
-        for i in range(0, files_no, 300):
-            curr_slip = 300
-            if i + 300 > files_no:
+        step = 300
+        for i in range(0, files_no, step):
+            curr_slip = step
+            if i + step > files_no:
                 curr_slip = files_no - i
-            str_files = "\n".join(files[i:i+curr_slip])
+            str_files = " ".join(files[i:i+curr_slip])
             output += run_cmd(cmd % str_files)
 
         return output
 
     def get_all_modinfo(self):
         running_kms = run_cmd("/usr/sbin/modinfo $(cat /proc/modules | awk '{print $1}') | grep filename | awk '{print$2}'").splitlines()
+        # Have to remove the invalid running kernel module, like it's running inside container.
+        # But it always can't get rpm information if it's running inside container.
+        running_kms = [file for file in running_kms if not file.startswith("modinfo: ERROR:")]
         lm_kms = run_cmd("find /lib/modules/ -regex \".*\.\(ko\|ko.xz\|ko.zst\)$\"").splitlines()
         
         files = list(set(running_kms + lm_kms))

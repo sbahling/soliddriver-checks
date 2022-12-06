@@ -14,14 +14,6 @@ from ..config import SDCConf
 from enum import Enum, unique
 from .utils.cmd import run_cmd
 
-def get_cmd_all_drivers_modinfo():
-    return '/usr/sbin/modinfo $(find /lib/modules/ -regex ".*\.\(ko\|ko.xz\|ko.zst\)$") 2>&1'
-
-
-def get_cmd_all_running_drivers_modinfo():
-    return "/usr/sbin/modinfo $(cat /proc/modules | awk '{print $1}') 2>&1"
-
-
 
 def raw_kmp_to_series(data):
     return pd.Series({

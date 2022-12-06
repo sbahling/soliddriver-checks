@@ -31,18 +31,63 @@ class KMReporter:
     def __init__(self):
         self._style = SDCConf()
         
-    def to_html(self, df, filename):
+    def to_html(self, df, file):
+        pkg_path = os.path.dirname(__file__)
+        jinja_tmpl = f"{pkg_path}/../config/templates"
+        file_loader = FileSystemLoader(jinja_tmpl)
+        env = Environment(loader=file_loader)
+
+        km_tmpl = env.get_template("km-report.html.jinja")
+
+        details = []
+        for label, driver_table in df.items():
+            if driver_table is None:
+                details.append({"name": label, "table": "Connect error!"})
+                continue
+
+            dt = driver_table["drivers"]
+            self._wu_dt = driver_table["weak-update-drivers"]
+            total_drivers, tp_drivers, failed_drivers = self._get_server_summary(dt)
+            df = dt.copy()
+            df = self._get_third_party_drivers(df)
+
+            # add no information drivers
+            noinfo_drivers = driver_table["noinfo-drivers"]
+            df = self._append_noinfo_drivers(noinfo_drivers, df)
+            df.loc[df["running"] == "True", "running"] = "&#9989;"
+            df.loc[df["running"] == "False", "running"] = "&#9940;"
+            df = self._refmt_supported(df)
+            ts = (
+                # df.style.hide(axis='index')
+                df.style.hide_index()
+                .set_table_attributes('class="table_center"')
+                .apply(self._format_row_html, axis=1)
+            )
+
+            details.append(
+                {
+                    "name": label,
+                    "total_drivers": total_drivers,
+                    "third_party_drivers": tp_drivers,
+                    "failed_drivers": failed_drivers,
+                    "table": ts.render(),
+                }
+            )
+
+        driver_checks = driver_tmpl.render(version=_get_version(), timestamp=_generate_timestamp(), details=details)
+
+        with open(file, "w") as f:
+            f.write(driver_checks)
+    
+    def to_excel(self, df, file):
         pass
     
-    def to_excel(self, df, filename):
-        pass
-    
-    def to_json(self, buffer, filename):
-        if buffer is None or buffer == "":
+    def to_json(self, buffer, file):
+        if buffer is None:
             buffer = kms_to_json()
         
-        with open(filename, "w") as fp:
-            json.dump(buffer, fp)
+        with open(file, "w") as fp:
+            json.dump(json.loads(buffer), fp)
 
 
 class KMPReporter:
@@ -274,7 +319,6 @@ class KMPReporter:
     def to_pdf(self, df):
         pass
 
-class RPMsExporter:
     def __init__(self):
         self._style = SDCConf()
 
