@@ -77,7 +77,7 @@ class KMAnalysis:
         sps = supported.splitlines()
         lev = KMEvaluation.PASS
         # no supported flag or 1 supported flag but the value is not yes(supported by SUSE) or supported (supported by others).
-        if len(sps) == 0 or (len(sps) == 1 and (sps[0] != "yes" or sps[0] != "supported")):
+        if len(sps) == 0 or (len(sps) == 1 and (sps[0] != "yes" or sps[0] != "no" or sps[0] != "supported")):
             lev = KMEvaluation.ERROR
         elif len(sps) > 1:
             lev = KMEvaluation.WARNING
@@ -178,7 +178,7 @@ class KMReader:
                     info[k] = v
             kms[filename]            = info
             kms[filename]["running"] = filename in running_kms
-            kms[filename]["rpm"]     = {"name": kmps[kmp_index], "signature": kmps_sig_pair.get(kmps[kmp_index], "")}
+            kms[filename]["kmp"]     = {"name": kmps[kmp_index], "signature": kmps_sig_pair.get(kmps[kmp_index], "")}
             kmp_index += 1
         
         self._check_weak_links(kms)
