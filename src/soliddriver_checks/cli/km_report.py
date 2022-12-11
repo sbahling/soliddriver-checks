@@ -118,10 +118,10 @@ class KMReporter:
     def to_excel(self, df, file):
         pass
     
-    def to_json(self, buffer, file):
-        if buffer is None:
-            buffer = kms_to_json()
+    def to_json(self, sys_info, file):
+        buffer = kms_to_json()
         
+        #TODO: add sys_info to json output.
         with open(file, "w") as fp:
             json.dump(json.loads(buffer), fp)
 
