@@ -25,13 +25,52 @@ import re
 from copy import copy
 from ..config import SDCConf, ExcelTemplate, get_version, generate_timestamp
 from ..api.kmp import KMPEvaluation
+from ..api.km import KMEvaluation
 from ..api.analysis import kms_to_dataframe, kms_to_json
 
 class KMReporter:
     def __init__(self):
         self._style = SDCConf()
+    
+    def _format_cell(slef, value):
+        if type(value) == dict:
+            return value.get("value", "")
+        else:
+            return value
+    
+    def _row_style_in_html(self, row):
+        # TODO: row style should be added
+        def _get_cell_style(row_level, cell_level):
+            style = ""
+            cristyle = self._style.get_driver_html_warn_critical()
+            impstyle = self._style.get_driver_html_warn_important()
+            cri_bgcolor = cristyle["background-color"]
+            cri_color = cristyle["color"]
+            cri_border = cristyle["border"]
         
-    def to_html(self, df, file):
+            imp_bgcolor = impstyle["background-color"]
+            imp_border = impstyle["border"]
+            
+            if KMEvaluation.WARNING == cell_level:
+                style = f"background-color:{imp_bgcolor}"
+            elif KMEvaluation.ERROR == cell_level:
+                style = f"background-color:{cri_bgcolor} color:{cri_color}"
+            
+            return style
+        
+        return [
+            "", # level style, no need for this.
+            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["Module Name"]["level"])),
+            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["File"]["level"])),
+            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["License"]["level"])),
+            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["Signature"]["level"])),
+            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row['"supported" Flag']["level"])),
+            "", # running style, no need for this.
+            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["KMP"]["level"]))
+        ]
+        
+
+    def to_html(self, sys_info, file):
         pkg_path = os.path.dirname(__file__)
         jinja_tmpl = f"{pkg_path}/../config/templates"
         file_loader = FileSystemLoader(jinja_tmpl)
@@ -39,45 +78,42 @@ class KMReporter:
 
         km_tmpl = env.get_template("km-report.html.jinja")
 
-        details = []
-        for label, driver_table in df.items():
-            if driver_table is None:
-                details.append({"name": label, "table": "Connect error!"})
-                continue
+        df_format = kms_to_dataframe()
+        kms_in_total = len(df_format.index)
+        failed_kms_in_total = len([f for f in df_format["level"].to_list() if KMEvaluation(f) != KMEvaluation.PASS])
+        
+        df_format = df_format.rename(
+            columns = {
+                "level"      : "level",
+                "modulename" : "Module Name",
+                "filename"   : "File",
+                "license"    : "License",
+                "signature"  : "Signature",
+                "supported"  : '"supported" Flag',
+                "kmp"        : "KMP"
+            }
+        )
+        ts = df_format.style.hide(axis="index").hide([('level')], axis="columns").set_table_attributes('class="table_center"').apply(self._row_style_in_html, axis=1).format(self._format_cell)
+        
+        # df["running"].loc[df.running == True] = "&#9989;"
+        # df["running"].loc[df.running == False] = "&#9940;"
+        # df["running"].loc[df.running == ""] = "N/A"
+        
+        # Will be easier to get the value if run this after reformat the values.
+        external_kms_in_total = len([sf for sf in df_format['"supported" Flag'].to_list() if sf == "external"])
 
-            dt = driver_table["drivers"]
-            self._wu_dt = driver_table["weak-update-drivers"]
-            total_drivers, tp_drivers, failed_drivers = self._get_server_summary(dt)
-            df = dt.copy()
-            df = self._get_third_party_drivers(df)
-
-            # add no information drivers
-            noinfo_drivers = driver_table["noinfo-drivers"]
-            df = self._append_noinfo_drivers(noinfo_drivers, df)
-            df.loc[df["running"] == "True", "running"] = "&#9989;"
-            df.loc[df["running"] == "False", "running"] = "&#9940;"
-            df = self._refmt_supported(df)
-            ts = (
-                # df.style.hide(axis='index')
-                df.style.hide_index()
-                .set_table_attributes('class="table_center"')
-                .apply(self._format_row_html, axis=1)
+        kms_buffer = km_tmpl.render(
+            version               = get_version(),
+            timestamp             = generate_timestamp(),
+            sysinfo               = sys_info,
+            kms_in_total          = kms_in_total,
+            external_kms_in_total = external_kms_in_total,
+            failed_kms_in_total   = failed_kms_in_total,
+            kms_table             = ts.to_html()
             )
-
-            details.append(
-                {
-                    "name": label,
-                    "total_drivers": total_drivers,
-                    "third_party_drivers": tp_drivers,
-                    "failed_drivers": failed_drivers,
-                    "table": ts.render(),
-                }
-            )
-
-        driver_checks = driver_tmpl.render(version=_get_version(), timestamp=_generate_timestamp(), details=details)
 
         with open(file, "w") as f:
-            f.write(driver_checks)
+            f.write(kms_buffer)
     
     def to_excel(self, df, file):
         pass
@@ -777,36 +813,7 @@ class DriversExporter:
 
         return df
 
-    def _append_noinfo_drivers(self, noinfo_drivers, drivers):
-        for driver in noinfo_drivers:
-            row = [
-                driver,
-                "Can not find file under /lib/modules",
-                "",
-                "",
-                "",
-                "",
-                "True",
-                f"driver {driver} is not owned by any package",
-            ]
-            drivers = drivers.append(
-                pd.Series(
-                    row,
-                    index=[
-                        "name",
-                        "path",
-                        "flag_supported",
-                        "license",
-                        "signature",
-                        "os-release",
-                        "running",
-                        "rpm",
-                    ],
-                ),
-                ignore_index=True,
-            )
-
-        return drivers
+ 
 
     def to_html(self, driver_tables, file):
         pkg_path = os.path.dirname(__file__)

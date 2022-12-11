@@ -26,22 +26,22 @@
             background-color: #30BA78;
          }
          th.col0{
-            width:15%;
+            width:5%;
          }
          th.col5{
-            width:20%;
+            width:5%;
          }
          th.col4{
             width:5%;
          }
          th.col3{
-            width:10%;
+            width:5%;
          }
          th.col2{
-            width:10%;
+            width:50%;
          }
          th.col1{
-             width:50%;
+             width:10%;
          }
          th.col6{
             width:5%;
@@ -72,28 +72,26 @@
     <p style="font-size:small;"><strong>soliddriver-checks</strong> is a tool for parnter and customer to check their <strong>KMPs(Kernel Module Packages)</strong> or <strong>installed/running kernel modules</strong> whether can meet basic SUSE requirements. More information can be found <a href="https://github.com/SUSE/soliddriver-checks" style="background-color: #30BA78;">here</a></p>
     <p style="font-size:small;"><strong style="background-color:yellow; color:red;">Notice: </strong> Only kernel modules provided by third parties can be list in this report, for full report please use json output.</p>
     <p style="font-size:small;text-align:center">{{version}}  {{timestamp}}</p>
-    {% for detail in details -%}
-      <div>
-        <p style="text-align: center; font-size:large;background-color: #30BA78;">soliddriver check report: {{detail.name}}</p>
-      </div>
-      <div style="background-color: #30BA78;;">
-          <table style="width: 600px; margin-left: auto;margin-right: auto; border-collapse: collapse; border:hidden">
-              <tr style="border:hidden">
-                  <td style="text-align: right;font-size: medium;border:hidden">Total Drivers :</td>
-                  <td style="text-align: center;font-size: medium;border:hidden">{{detail.total_drivers}}</td>
-              </tr>
-              <tr style="border:hidden">
-                <td style="text-align: right;font-size: medium;border:hidden">Drivers provided by third parties :</td>
-                <td style="text-align: center;font-size: medium;border:hidden">{{detail.third_party_drivers}}</td>
-            </tr>
-            <tr style="border:hidden">
-                <td style="text-align: right;font-size: medium;border:hidden">Drivers check failed :</td>
-                <td style="text-align: center;font-size: medium;border:hidden">{{detail.failed_drivers}}</td>
-            </tr>
-          </table>
-      </div>
-      <br>
-      {{detail.table}}
-    {% endfor %}
+    <div>
+      <p style="text-align: center; font-size:large;background-color: #30BA78;">System information: {{sys_info}}</p>
+    </div>
+    <div style="background-color: #30BA78;;">
+      <table style="width: 600px; margin-left: auto;margin-right: auto; border-collapse: collapse; border:hidden">
+          <tr style="border:hidden">
+              <td style="text-align: right;font-size: medium;border:hidden">Total Drivers :</td>
+              <td style="text-align: center;font-size: medium;border:hidden">{{kms_in_total}}</td>
+          </tr>
+          <tr style="border:hidden">
+            <td style="text-align: right;font-size: medium;border:hidden">Drivers provided by third parties :</td>
+            <td style="text-align: center;font-size: medium;border:hidden">{{external_kms_in_total}}</td>
+        </tr>
+        <tr style="border:hidden">
+            <td style="text-align: right;font-size: medium;border:hidden">Drivers check failed :</td>
+            <td style="text-align: center;font-size: medium;border:hidden">{{failed_kms_in_total}}</td>
+        </tr>
+      </table>
+  </div>
+  <br>
+  {{kms_table}}
 </body>
 </html>
