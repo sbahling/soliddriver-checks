@@ -115,7 +115,7 @@ class KMReporter:
         with open(file, "w") as f:
             f.write(kms_buffer)
     
-    def to_excel(self, df, file):
+    def to_excel(self, sys_info, file):
         pass
     
     def to_json(self, sys_info, file):

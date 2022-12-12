@@ -44,6 +44,7 @@ class KMAnalysis:
             lev_r, running = self._km_running_analysis(kms[filename].get("running", ""))
             row_level.append(lev_r.value)
             lev_kmp, kmp = self._km_kmp_analysis(kms[filename].get("kmp", None))
+            row_level.append(lev_kmp.value)
             
             row = pd.Series({
                              "level": KMEvaluation(max(row_level)),

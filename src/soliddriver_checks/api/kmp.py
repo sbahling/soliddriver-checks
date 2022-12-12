@@ -72,8 +72,8 @@ class KMPAnalysis:
         ana_level.append(ven_lev.value)
         lic_lev, license_anls = self._licenses_analysis([data["license"]])
         ana_level.append(lic_lev.value)
-        level, wm2_invoked_anls = self._kmp_wm2_invoked_analysis(data["wm2_invoked"])
-        ana_level.append(level.value)
+        wm2_lev, wm2_invoked_anls = self._kmp_wm2_invoked_analysis(data["wm2_invoked"], data["name"])
+        ana_level.append(wm2_lev.value)
         km_lev, km_anls = self._kmp_km_analysis(data["reqs"], data["modalias"], data["km_info"])
         ana_level.append(km_lev.value)
         
@@ -84,7 +84,7 @@ class KMPAnalysis:
             "vendor"     : {"level": ven_lev,  "value": vendor_anls},
             "signature"  : {"level": sig_lev,  "value": sig_anls},
             "license"    : {"level": lic_lev,  "value": license_anls},
-            "wm2_invoked": {"level": lic_lev,  "value": wm2_invoked_anls},
+            "wm2_invoked": {"level": wm2_lev,  "value": wm2_invoked_anls},
             "km"         : km_anls
         }
 
@@ -121,8 +121,8 @@ class KMPAnalysis:
         
         return KMPEvaluation.WARNING, "Invalid or non Opensource license found: %s" % " ".join(invlics)
 
-    def _kmp_wm2_invoked_analysis(self, wm2):
-        if wm2:
+    def _kmp_wm2_invoked_analysis(self, wm2, kmp_name):
+        if wm2 or "debuginfo" in kmp_name: # currently we ignore wm2 check for debuginfo package.
             return KMPEvaluation.PASS, wm2
         
         return KMPEvaluation.ERROR, wm2
