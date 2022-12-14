@@ -16,10 +16,9 @@ from ..version import __VERSION__
 
 FORMAT_TYPES = {
     "html": ".html",
-    "excel": ".xlsx",
+    "xlsx": ".xlsx",
     "pdf": ".pdf",
     "json": ".json",
-    "all": None,
 }
 
 
@@ -74,14 +73,10 @@ def export(exporter, check_result, out_format, dst):
     dst = with_format_suffix(dst, out_format)
     if out_format == "html":
         exporter.to_html(check_result, dst)
-    elif out_format == "excel":
-        exporter.to_excel(check_result, dst)
-    elif out_format == "pdf":
-        exporter.to_pdf(check_result, dst)
+    elif out_format == "xlsx":
+        exporter.to_xlsx(check_result, dst)
     elif out_format == "json":
         exporter.to_json(check_result, dst)
-    elif out_format == "all":
-        exporter.to_all(check_result, dst)
 
 
 def dst_is_ok(dst, out_format):

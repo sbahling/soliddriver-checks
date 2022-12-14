@@ -4,9 +4,6 @@ from openpyxl.styles import (
     Font,
     Border,
     Side,
-    Alignment,
-    NamedStyle,
-    borders,
 )
 from openpyxl import load_workbook
 import json
@@ -55,66 +52,63 @@ class SDCConf:
     def get_valid_licenses(self):
         return self._conf["valid-licenses"]
 
-    def get_rpm_xslx_table_header(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "header")
+    def get_kmp_header(self):
+        return self._get_xlsx_info("kmp", "xlsx", "table", "header")
 
-    def get_rpm_xslx_table_normal(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "data", "normal")
+    def get_kmp_normal(self):
+        return self._get_xlsx_info("kmp", "xlsx", "table", "data", "normal")
 
-    def get_rpm_xslx_table_important_failed(self):
+    def get_kmp_warning(self):
         return self._get_xlsx_info(
-            "rpm-check", "excel", "table", "data", "important-failed"
+            "kmp", "xlsx", "table", "data", "warning"
         )
 
-    def get_rpm_xslx_table_critical_failed(self):
+    def get_kmp_error(self):
         return self._get_xlsx_info(
-            "rpm-check", "excel", "table", "data", "critical-failed"
+            "kmp", "xlsx", "table", "data", "error"
         )
 
-    def get_rpm_xslx_table_great_row(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "row", "great")
+    def get_kmp_row_pass(self):
+        return self._get_xlsx_info("kmp", "xlsx", "table", "row", "pass")
 
-    def get_rpm_xslx_table_warn_row(self):
-        return self._get_xlsx_info("rpm-check", "excel", "table", "row", "warn")
+    def get_km_sig_keys(self):
+        return self._conf["km"]["sig-keys"]
 
-    def get_driver_html_warn_critical(self):
-        return self._conf["driver-check"]["html"]["critical_failed"]
+    def get_km_header(self):
+        return self._get_xlsx_info("km", "xlsx", "table", "header")
 
-    def get_driver_sig_keys(self):
-        return self._conf["driver-check"]["sig-keys"]
+    def get_km_normal(self):
+        return self._get_xlsx_info("km", "xlsx", "table", "data", "normal")
 
-    def get_driver_html_warn_important(self):
-        return self._conf["driver-check"]["html"]["important_failed"]
-
-    def get_driver_xslx_table_header(self):
-        return self._get_xlsx_info("driver-check", "excel", "table", "header")
-
-    def get_driver_xslx_table_normal(self):
-        return self._get_xlsx_info("driver-check", "excel", "table", "data", "normal")
-
-    def get_driver_xslx_table_important_failed(self):
+    def get_km_warning(self):
         return self._get_xlsx_info(
-            "driver-check", "excel", "table", "data", "important-failed"
+            "km", "xlsx", "table", "data", "warning"
         )
 
-    def get_driver_xslx_table_critical_failed(self):
+    def get_km_error(self):
         return self._get_xlsx_info(
-            "driver-check", "excel", "table", "data", "critical-failed"
+            "km", "xlsx", "table", "data", "error"
         )
 
-    def get_driver_xslx_table_warn_row(self):
-        return self._get_xlsx_info("driver-check", "excel", "table", "row", "warn")
+    def get_km_warn_row(self):
+        return self._get_xlsx_info("km", "xlsx", "table", "row", "warn")
+    
+    def get_km_html_warning(self):
+        return self._conf["km"]["html"]["warning"]
+    
+    def get_km_html_error(self):
+        return self._conf["km"]["html"]["error"]
 
 
-class ExcelTemplate:
+class xlsxTemplate:
     def __init__(self):
         pkg_path = os.path.dirname(__file__)
         self._cfg_path = f"{pkg_path}/../config/templates/templates.xlsx"
 
-    def set_driver_check_overview(self, ws):
+    def set_km_check_overview(self, ws):
         self._copy_work_sheep("km-report-overview", ws)
 
-    def set_rpm_check_overview(self, ws):
+    def set_kmp_check_overview(self, ws):
         self._copy_work_sheep("kmp-report-overview", ws)
 
     def _copy_work_sheep(self, title, ws):

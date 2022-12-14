@@ -1,15 +1,6 @@
-
-from pathlib import Path
 import os
-import paramiko
 import pandas as pd
-# import select
-import re
-from collections import namedtuple
-import tempfile
-import fnmatch
 import json
-from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 from ..config import SDCConf
 from enum import Enum, unique
 from .utils.cmd import run_cmd
@@ -220,101 +211,4 @@ class KMReader:
         
         return kmp_sig_pairs
         
-
-class DriverReader:
-    def __init__(self, progress):
-        self._progress = progress
-        self._columns = [
-            "name",
-            "path",
-            "flag_supported",
-            "license",
-            "signature",
-            "os-release",
-            "running",
-            "rpm",
-            "rpm_sig_key",
-        ]
-        self._ssh = None
-
-    def _connect(self, hostname, user, password, ssh_port):
-        self._ssh = paramiko.SSHClient()
-        self._ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            self._ssh.connect(
-                hostname=hostname,
-                username=user,
-                password=password,
-                port=ssh_port,
-                allow_agent=False,
-                look_for_keys=False,
-            )
-            return True
-        except NoValidConnectionsError as e:
-            self._progress.console.print(
-                f"[bold red]Can not connect to {hostname}, failed: {e}[/]"
-            )
-        except SSHException as e:
-            self._progress.console.print(
-                f"[bold red]Can not connect to {hostname}, failed: {e}[/]"
-            )
-
-        return False
-
-    def _run_script(self, script_file, remote=False):
-        result = ""
-        if remote:
-            dist_path = "/tmp/check-links.sh"
-            with SCPClient(self._ssh.get_transport()) as scp:
-                scp.put(script_file, dist_path)
-            result = run_cmd(dist_path, self._ssh).decode()
-        else:
-            result = run_cmd(script_file)
-
-        return result
-
-    def get_remote_drivers(
-        self, ip="127.0.0.1", user="", password="", ssh_port=22, query="all"
-    ):
-        if not self._connect(ip, user, password, ssh_port):
-            return None
-
-        try:
-            drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo(), self._ssh)
-            running_drivers_modinfo = run_cmd(
-                get_cmd_all_running_drivers_modinfo(), self._ssh
-            )
-
-            noinfo_drivers = self._find_noinfo_drivers(running_drivers_modinfo)
-            driver_table = self._fill_driver_info(
-                ip, drivers_modinfo, running_drivers_modinfo, query, True
-            )
-
-            wu_driver_table = self._weak_update_driver_checks(remote=True)
-            # srcv_t = self._srcversion_checks(remote=True)
-        except NoValidConnectionsError as e:
-            self._progress.console.print(f"[bold red]Connect to {ip} failed : {e}[/]")
-        finally:
-            pass
-
-        self._progress.update(self._task, visible=False)
-
-        return driver_table, wu_driver_table, noinfo_drivers
-
-    def get_local_drivers(self, query="all", row_handlers=[]):
-        drivers_modinfo = run_cmd(get_cmd_all_drivers_modinfo())
-        running_drivers_modinfo = run_cmd(get_cmd_all_running_drivers_modinfo())
-
-        driver_table = self._fill_driver_info(
-            "local host", drivers_modinfo, running_drivers_modinfo, query
-        )
-
-        return driver_table, wu_driver_table, noinfo_drivers
-
-    def _modinfo_to_list(self, raw_output):
-        raw_output = str(raw_output, "utf-8")
-        raw_output = list(raw_output.split("filename:"))
-
-        return raw_output[1:]
-
 

@@ -15,17 +15,4 @@ class KMPTerminalOutput:
         self._progress.advance(self._task)
     
     def complete(self):
-        self._progress.console.print("All KMPs are processed!")
-
-
-    # def process_kmp(self, kmp):
-    #     reader = KMPReader()
-    #     anls = KMPAnalysis()
-    #     self._terminal_output.prepartion([kmp])
-        
-    #     raw_info = reader.collect_kmp_data(kmp)
-    #     anls_info = anls.kmp_analysis(raw_info)
-    #     self._terminal_output.kmp_process(anls_info)
-    #     self._terminal_output.complete()
-        
-    #     return anls_info
+        pass

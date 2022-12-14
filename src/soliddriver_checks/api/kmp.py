@@ -1,15 +1,10 @@
 
 from pathlib import Path
-import os
-import paramiko
 import pandas as pd
-# import select
 import re
 from collections import namedtuple
 import tempfile
 import fnmatch
-import json
-from paramiko.ssh_exception import NoValidConnectionsError, SSHException
 from ..config import SDCConf
 from enum import Enum, unique
 from .utils.cmd import run_cmd
@@ -254,7 +249,7 @@ class KMPAnalysis:
         if str(signature) != "":
             return KMPEvaluation.PASS, "Exist"
         
-        return KMPEvaluation.ERROR, "No signature found"        
+        return KMPEvaluation.WARNING, "No signature found"        
 
     def _km_supported_analysis(self, values):
         if len(values) < 1:
