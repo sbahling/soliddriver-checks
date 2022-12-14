@@ -1,24 +1,24 @@
 import click
 import json
-from .utils import remote_check
-from .utils import data_exporter
-from .utils import data_reader
+from ..api import analysis
+from .terminal_logs import KMPTerminalOutput
+from ..api.utils.remote_analysis import check_remote_servers
+from .kmp_report import KMPReporter
+from .km_report import KMReporter
 import os
 import logging
 import socket
 from pathlib import Path
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from .version import __VERSION__
+from ..version import __VERSION__
 
 
-QUERY_TYPES = ["suse", "other", "unknown", "all"]
 FORMAT_TYPES = {
     "html": ".html",
-    "excel": ".xlsx",
+    "xlsx": ".xlsx",
     "pdf": ".pdf",
     "json": ".json",
-    "all": None,
 }
 
 
@@ -73,14 +73,10 @@ def export(exporter, check_result, out_format, dst):
     dst = with_format_suffix(dst, out_format)
     if out_format == "html":
         exporter.to_html(check_result, dst)
-    elif out_format == "excel":
-        exporter.to_excel(check_result, dst)
-    elif out_format == "pdf":
-        exporter.to_pdf(check_result, dst)
+    elif out_format == "xlsx":
+        exporter.to_xlsx(check_result, dst)
     elif out_format == "json":
         exporter.to_json(check_result, dst)
-    elif out_format == "all":
-        exporter.to_all(check_result, dst)
 
 
 def dst_is_ok(dst, out_format):
@@ -117,18 +113,6 @@ def dst_is_ok(dst, out_format):
     help="Specify output format (PDF is in Beta)",
 )
 @click.option(
-    "--query",
-    "-q",
-    type=click.Choice(QUERY_TYPES),
-    default="all",
-    help="Filter results based on vendor tag "
-    "from rpm package providing module. "
-    '"suse" = SUSE, '
-    '"other" = other vendors, '
-    '"unknown" = vendor is unknown, '
-    '"all" = show all (default)',
-)
-@click.option(
     "--output",
     "-o",
     default=".",
@@ -142,7 +126,7 @@ def dst_is_ok(dst, out_format):
     "be automatically appended matching on the output format",
 )
 @click.option("--version", is_flag=True)
-def run(check_target, output, out_format, query, version):
+def run(check_target, output, out_format, version):
     """Run checks against CHECK_TARGET.
 
     \b
@@ -167,8 +151,6 @@ def run(check_target, output, out_format, query, version):
 
     target = Check_Target(check_target)
 
-    query = query.lower()
-
     dst = Path(output)
     if dst.is_dir() or output.endswith("/"):
         dst = dst / "check_result"
@@ -190,8 +172,8 @@ def run(check_target, output, out_format, query, version):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
         with progress:
-            rpmCheck = data_reader.RPMReader(progress)
-            check_result = rpmCheck.get_rpm_info(target.rpm)
+            rpm_check = terminal_logs.KMPProcessor(terminal_logs.KMPTerminalOutput(progress))
+            check_result = rpm_check.process_kmp(target.rpm)
 
     elif target.dir:
         progress = Progress(
@@ -201,10 +183,10 @@ def run(check_target, output, out_format, query, version):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         )
         with progress:
-            rpmCheck = data_reader.RPMReader(progress)
-            check_result = rpmCheck.get_rpms_info(path=target.dir, query=query)
-        exporter = data_exporter.RPMsExporter()
-        export(exporter, check_result, out_format, dst)
+            log = KMPTerminalOutput(progress)
+            df = analysis.kmps_to_dataframe(target.dir, log)
+        reporter = KMPReporter()
+        export(reporter, df, out_format, dst)
         logger.info(
             "[green]Check is completed![/]"
             "The result has been saved to "
@@ -218,37 +200,16 @@ def run(check_target, output, out_format, query, version):
             ip = socket.gethostbyname(hostname)
         except socket.gaierror as e:
             logger.warning(f"Get ip by hostname: {hostname} failed: {e}")
-        finally:
             ip = "127.0.0.1"
+
         label = "%s (%s)" % (hostname, ip)
         logger.info("Retrieving kernel module data for %s" % label)
-        progress = Progress(
-            "{task.description}",
-            SpinnerColumn(),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        )
-        with progress:
-            driverCheck = data_reader.DriverReader(progress)
-            drivers, wu_drivers, noinfo_drivers = driverCheck.get_local_drivers(query)
-            check_result = {
-                label: {
-                    "drivers": drivers,
-                    "weak-update-drivers": wu_drivers,
-                    "noinfo-drivers": noinfo_drivers,
-                }
-            }
-        exporter = data_exporter.DriversExporter()
-        export(exporter, check_result, out_format, dst)
-        progress.console.print(
-            "[green]Check is completed![/]"
-            "The result has been saved to "
-            "[bold green]%s[/]" % dst
-        )
+        reporter = KMReporter()
+        export(reporter, label, out_format, dst)
 
     elif target.config is not None:
         servers = target.config["servers"]
-        check_result = remote_check.check_remote_servers(logger, servers)
+        check_result = check_remote_servers(logger, servers)
         exporter = data_exporter.DriversExporter()
         export(exporter, check_result, out_format, dst)
         logger.info(

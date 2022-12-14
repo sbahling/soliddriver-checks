@@ -1,2 +1,2 @@
 recursive-include src/soliddriver_checks/config *
-recursive-include src/soliddriver_checks/utils/scripts *
+recursive-include src/soliddriver_checks/api/utils/scripts *
