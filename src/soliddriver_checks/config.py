@@ -15,8 +15,10 @@ from copy import copy
 def get_version():
     return f"version: {__VERSION__}"
 
+
 def generate_timestamp():
     return f"timestamp: {datetime.now()}"
+
 
 class SDCConf:
     def __init__(self):
@@ -38,7 +40,8 @@ class SDCConf:
             color=conf["font"]["color"],
         )
         sd = Side(
-            border_style=conf["side"]["border_style"], color=conf["side"]["color"]
+            border_style=conf["side"]["border_style"],
+            color=conf["side"]["color"]
         )
         bd = Border(top=sd, left=sd, right=sd, bottom=sd)
         fill = PatternFill(
@@ -92,10 +95,10 @@ class SDCConf:
 
     def get_km_warn_row(self):
         return self._get_xlsx_info("km", "xlsx", "table", "row", "warn")
-    
+
     def get_km_html_warning(self):
         return self._conf["km"]["html"]["warning"]
-    
+
     def get_km_html_error(self):
         return self._conf["km"]["html"]["error"]
 

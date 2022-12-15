@@ -19,7 +19,7 @@ def kmps_to_dataframe(path, proc_injector=None):
 
     if proc_injector is not None:
         proc_injector.complete()
-        
+
     return analysis_kmps_to_dataframe(data)
 
 
@@ -28,18 +28,19 @@ def kmps_to_json(path, proc_injector=None):
 
     return df.to_json(orient="records")
 
+
 def kms_to_dataframe():
     reader = KMReader()
     anls = KMAnalysis()
-    
+
     return anls.kms_analysis(reader.get_all_modinfo())
+
 
 def kms_to_json():
     df = kms_to_dataframe()
-    
+
     return df.to_json(orient="records")
 
 
 def remote_km_to_json(remote_info):
     pass
-

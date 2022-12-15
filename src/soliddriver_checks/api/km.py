@@ -12,12 +12,13 @@ class KMEvaluation (Enum):
     WARNING = 2
     ERROR = 3
 
+
 class KMAnalysis:
     def __init__(self):
         conf = SDCConf()
         self._valid_licenses = conf.get_valid_licenses()
         self._valid_licenses = [i.get('name', '') for i in self._valid_licenses]
-    
+
     def kms_analysis(self, kms):
         row_level = []
         df = pd.DataFrame()
@@ -36,7 +37,7 @@ class KMAnalysis:
             row_level.append(lev_r.value)
             lev_kmp, kmp = self._km_kmp_analysis(kms[filename].get("kmp", None))
             row_level.append(lev_kmp.value)
-            
+
             row = pd.Series({
                              "level": KMEvaluation(max(row_level)),
                              "modulename": {"level": lev_name, "value": name},
@@ -47,25 +48,25 @@ class KMAnalysis:
                              "running": {"level": lev_r, "value": running},
                              "kmp": {"level": lev_kmp, "value": kmp}
                              })
-            
+
             df = pd.concat([df, row.to_frame().T], ignore_index=True)
-        
+
         return df
-    
+
     def _km_module_name_analysis(self, name):
         return KMEvaluation.PASS, name
-    
+
     def _km_filename_analysis(self, filename, wu):
         lev = KMEvaluation.PASS
         if not filename.startswith("/lib/modules"):
             lev = KMEvaluation.WARNING
-        
+
         if wu != 0: # under weak-updates folder, and have issues.
             if wu == 2 or wu == 3: # kernel module does not exist or not a link
                 lev = KMEvaluation.ERROR
-        
+
         return lev, filename
-    
+
     def _km_supported_analysis(self, supported):
         sps = supported.splitlines()
         lev = KMEvaluation.PASS
@@ -80,39 +81,39 @@ class KMAnalysis:
                     break
 
         return lev, sps
-    
+
     def _km_license_analysis(self, license):
         lev = KMEvaluation.PASS
-        
+
         lics = license.split('\n')
         for i in lics:
             if i not in self._valid_licenses:
                 lev = KMEvaluation.WARNING
                 break
-        
+
         return lev, license
-    
+
     def _km_signature_analysis(self, signature):
         if signature != "":
             return KMEvaluation.PASS, "Yes"
         else:
             return KMEvaluation.WARNING, "No"
-    
+
     def _km_running_analysis(self, running):
         return KMEvaluation.PASS, running
-    
+
     def _km_kmp_analysis(self, kmp):
         if None == kmp:
             return KMEvaluation.PASS, {"name": "", "signature": ""} 
 
         name = kmp["name"]
         signature = kmp["signature"]
-        
+
         if name.endswith("is not owned by any package"):
             return KMEvaluation.WARNING, "Not owned by any package"
         elif signature == "":
             return KMEvaluation.WARNING, name + ": has no signature"
-        
+
         return KMEvaluation.PASS, name + " signature found"
 
 
@@ -137,14 +138,14 @@ class KMReader:
         # But it always can't get rpm information if it's running inside container.
         running_kms = [file for file in running_kms if not file.startswith("modinfo: ERROR:")]
         lm_kms = run_cmd("find /lib/modules/ -regex \".*\.\(ko\|ko.xz\|ko.zst\)$\"").splitlines()
-        
+
         files = list(set(running_kms + lm_kms))
         # we don't need the entire signature, so add grep to ignore the details in other lines.
         kms_info = self._split_cmd_args(files, '/usr/sbin/modinfo %s | grep -E "^([a-z]|[A-Z])" 2>&1')
         kms_info = kms_info.split("filename:")
         if len(kms_info) == 0:
             return {}
-        
+
         kms = {}
         kmps = self._split_cmd_args(files, 'rpm -qf %s')
         kmps = kmps.splitlines()
@@ -178,9 +179,9 @@ class KMReader:
             kms[filename]["running"] = filename in running_kms
             kms[filename]["kmp"]     = {"name": kmps[kmp_index], "signature": kmps_sig_pair.get(kmps[kmp_index], "")}
             kmp_index += 1
-        
+
         self._check_weak_links(kms)
-        
+
         return kms
 
     def _check_weak_links(self, kms):
@@ -190,9 +191,9 @@ class KMReader:
         links = json.loads(j_links)
         for km in links["weak-updates"]:
             filename = km.get("km", None)
-            if None != filename:
+            if filename is not None:
                 kms[filename]["weak-updates"] = km.get("status", 0)
-    
+
     def _get_kmps_signature(self, kmps):
         uniq_kmps = set(kmps)
         invalid_kmps = []
@@ -201,14 +202,12 @@ class KMReader:
                 invalid_kmps.append(kmp)
         for ik in invalid_kmps:
             uniq_kmps.remove(ik)
-        
-        signatures = run_cmd(f'rpm -q --info {" ".join(uniq_kmps)} | grep -E "^Signature"').splitlines() # example: Signature   : RSA/SHA256, Wed 12 Oct 2022 06:57:49 PM CST, Key ID 70af9e8139db7c82
-        
+        # example: Signature   : RSA/SHA256, Wed 12 Oct 2022 06:57:49 PM CST, Key ID 70af9e8139db7c82
+        signatures = run_cmd(f'rpm -q --info {" ".join(uniq_kmps)} | grep -E "^Signature"').splitlines()
+
         kmp_sig_pairs = {}
         uniq_kmps = list(uniq_kmps)
         for i in range(0, len(uniq_kmps)):
             kmp_sig_pairs[uniq_kmps[i]] = signatures[i].split(":")[1:]
-        
-        return kmp_sig_pairs
-        
 
+        return kmp_sig_pairs
