@@ -45,12 +45,9 @@ setup(
     python_requires=">=3.7",
     install_requires=[
         'click',
-        'paramiko',
-        'pdfkit',
         'dominate',
         'rich',
-        'jinja2',
-        'scp'
+        'jinja2'
     ],
     entry_points={
         'console_scripts': [
