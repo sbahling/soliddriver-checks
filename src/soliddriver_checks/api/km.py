@@ -157,7 +157,7 @@ class KMReader:
         # filename:       /full/path/to/broken.ko
         # modinfo: ERROR: could not get modinfo from 'broken': Invalid argument
         # so if you want to match the KMP search index with the modinfo output index, you have to
-        # take care of above.
+        # take care of above. This is what I am doing.
         kmp_index = 0
         for km_info in kms_info[1:]: # first one is empty.
             lines = km_info.splitlines()
