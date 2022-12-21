@@ -11,13 +11,13 @@ from .xlsx_utils import XlsxTemplate, KMXlsxStyler
 class KMReporter:
     def __init__(self):
         self._style = SDCConf()
-    
+
     def _format_cell(slef, value):
         if type(value) == dict:
             return value.get("value", "")
         else:
             return value
-    
+
     def _row_style_in_html(self, row):
         # TODO: row style should be added
         def _get_cell_style(row_level, cell_level):
@@ -27,17 +27,17 @@ class KMReporter:
             cri_bgcolor = cristyle["background-color"]
             cri_color = cristyle["color"]
             cri_border = cristyle["border"]
-        
+
             imp_bgcolor = impstyle["background-color"]
             imp_border = impstyle["border"]
-            
+
             if KMEvaluation.WARNING == cell_level:
                 style = f"background-color:{imp_bgcolor}"
             elif KMEvaluation.ERROR == cell_level:
                 style = f"background-color:{cri_bgcolor} color:{cri_color}"
-            
+
             return style
-        
+
         return [
             "", # level style, no need for this.
             _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["Module Name"]["level"])),
@@ -48,7 +48,7 @@ class KMReporter:
             "", # running style, no need for this.
             _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["KMP"]["level"]))
         ]
-    
+
     def _format_columns(self, df):
         return df.rename(
             columns = {

@@ -35,7 +35,6 @@ Usage: soliddriver-checks [OPTIONS] [CHECK_TARGET]
   Run checks against CHECK_TARGET.
 
   CHECK_TARGET can be:
-    rpm file
     directory containing rpm files
     "system" to check locally installed kernel modules
     a config file listing remote systems to check (Please
@@ -44,16 +43,11 @@ Usage: soliddriver-checks [OPTIONS] [CHECK_TARGET]
     default is local system
 
 Options:
-  -f, --format [json|html|excel|pdf|all]
+  -f, --format [json|html|xlsx]
   				  Specify output format, default is html,all
-				  data can be saved in json format, html|excel|
-				  pdf are optimized for better view. The
+				  data can be saved in json format, html|xlsx 
+          are optimized for better view. The
                                   default output is $(pwd)/check_result.json
-  -q, --query [suse|other|unknown|all]
-                                  Filter results based on vendor tag from rpm
-                                  package providing module. "suse" = SUSE,
-                                  "other" = other vendors, "unknown" = vendor
-                                  is unknown, "all" = show all (default)
 
   -o, --output TEXT               Output destination. Target can be filename
                                   or point existing directory If directory,
@@ -79,34 +73,3 @@ Options:
     soliddriver-checks
     ```
 
- - Check remote drivers.
-   1. Put all your server information in a json config file, for example:
-   ```json
-   {
-    "servers": [
-      {
-        "check": "True",
-        "ip": "10.67.17.139",
-        "user": "username",
-        "password": "password",
-        "ssh_port": 22,
-        "query": "all"
-      },
-      {
-		"check": "True",
-		"ip": "10.67.18.39",
-		"user": "username",
-		"password": "password",
-		"ssh_port": 22,
-		"query": "vendor"
-	}
-    ]
-   }
-   ```
-   ```query```: respensent the supported flag you can give all, suse, vendor, unknow to it.
-
-   2. Run the command below:
-   ```bash
-   # generate excel report of your remote servers.
-   soliddriver-checks ./config.json
-   ```
