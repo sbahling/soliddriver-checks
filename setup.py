@@ -54,7 +54,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'soliddriver-checks=soliddriver_checks.cli.cli:run'
+            'soliddriver-checks=soliddriver_checks.cli.cli:run',
+            'soliddriver-checks-service=soliddriver_checks.service.service:run_as_service'
         ]
     },
 )

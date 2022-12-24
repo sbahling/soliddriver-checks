@@ -6,7 +6,7 @@ RUN zypper --non-interactive in python39 python39-pip kmod
 RUN zypper --non-interactive dup
 
 RUN pip3.9 install rich pdfkit pandas \
-openpyxl click paramiko dominate build
+openpyxl click paramiko dominate build bottle
 
 # easy for rebuild and install, source_codes is created in 
 # create_container_***.sh
