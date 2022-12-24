@@ -36,11 +36,9 @@ class KMInfo:
             t.start()
 
     def _refresh_data(self):
+        new_data = kms_to_json()
         with self._data_lock:
-            self._info = kms_to_json()
-
-
-
+            self._info = new_data
 
 
 def run_as_service(host="0.0.0.0", port=8080):
