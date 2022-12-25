@@ -7,14 +7,6 @@ import os
 import json
 
 
-@route('/kms_info')
-def kms_info():
-    response.content_type = 'application/json'
-    info = kms.data
-
-    return info
-
-
 class KMInfo:
     def __init__(self, interval):
         self._data_lock = Lock()
@@ -45,9 +37,18 @@ def run_as_service(host="0.0.0.0", port=8080):
     run(host=host, port=port)
 
 
+@route('/kms_info')
+def kms_info():
+    response.content_type = 'application/json'
+    info = kms.data
+
+    return info
+
+
 if __name__ == "__main__":
     interval = os.getenv("REFRESH_INTERVAL")
     interval = interval if interval is not None else 1
+    print("refresh interval: %s" % interval)
     global kms
     kms = KMInfo(interval)
 

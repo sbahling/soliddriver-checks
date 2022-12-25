@@ -8,6 +8,7 @@ from ..api.km import KMEvaluation
 from ..api.analysis import kms_to_dataframe, kms_to_json
 from .xlsx_utils import XlsxTemplate, KMXlsxStyler
 
+
 class KMReporter:
     def __init__(self):
         self._style = SDCConf()
@@ -26,10 +27,10 @@ class KMReporter:
             impstyle = self._style.get_km_html_warning()
             cri_bgcolor = cristyle["background-color"]
             cri_color = cristyle["color"]
-            cri_border = cristyle["border"]
+            # cri_border = cristyle["border"]
 
             imp_bgcolor = impstyle["background-color"]
-            imp_border = impstyle["border"]
+            # imp_border = impstyle["border"]
 
             if KMEvaluation.WARNING == cell_level:
                 style = f"background-color:{imp_bgcolor}"
@@ -39,7 +40,7 @@ class KMReporter:
             return style
 
         return [
-            "", # level style, no need for this.
+            "",  # level style, no need for this.
             _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["Module Name"]["level"])),
             _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["File"]["level"])),
             _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["License"]["level"])),
