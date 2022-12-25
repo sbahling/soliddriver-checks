@@ -5,6 +5,7 @@ from bottle import route, run, response
 from ..api.analysis import kms_to_json
 import os
 import json
+import logging
 
 
 class KMInfo:
@@ -12,9 +13,8 @@ class KMInfo:
         self._data_lock = Lock()
         self._info = json.dumps([])
         self._interval = interval
-        self._refresh_data()
-        t = Thread(self._async_refresh_data)
-        t.run()
+        t = Thread(target=self._async_refresh_data)
+        t.start()
 
     @property
     def data(self):
@@ -28,15 +28,17 @@ class KMInfo:
             t.start()
 
     def _refresh_data(self):
+        logging.info("start to refresh data...")
         new_data = kms_to_json()
         with self._data_lock:
             self._info = new_data
+        logging.info("refreshing data is completed!")
 
 
 def run_as_service(host="0.0.0.0", port=8080):
     interval = os.getenv("REFRESH_INTERVAL")
     interval = interval if interval is not None else 1
-    print("refresh interval: %s" % interval)
+    logging.info("refresh interval: %s hour(s)" % interval)
     global kms
     kms = KMInfo(interval)
     run(host=host, port=port)
