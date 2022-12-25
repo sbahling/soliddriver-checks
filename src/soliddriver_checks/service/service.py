@@ -34,6 +34,11 @@ class KMInfo:
 
 
 def run_as_service(host="0.0.0.0", port=8080):
+    interval = os.getenv("REFRESH_INTERVAL")
+    interval = interval if interval is not None else 1
+    print("refresh interval: %s" % interval)
+    global kms
+    kms = KMInfo(interval)
     run(host=host, port=port)
 
 
@@ -46,10 +51,4 @@ def kms_info():
 
 
 if __name__ == "__main__":
-    interval = os.getenv("REFRESH_INTERVAL")
-    interval = interval if interval is not None else 1
-    print("refresh interval: %s" % interval)
-    global kms
-    kms = KMInfo(interval)
-
     run_as_service()
