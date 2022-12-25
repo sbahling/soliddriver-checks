@@ -27,7 +27,7 @@ class KMInfo:
     def _async_refresh_data(self):
         while True:
             self._refresh_data()
-            sleep(self._interval * 60)
+            sleep(self._interval * 60 * 60)
 
     def _refresh_data(self):
         logger.info("start to refresh data...")
