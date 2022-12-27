@@ -30,26 +30,20 @@ class KMInfo:
             sleep(self._interval * 60 * 60)
 
     def _refresh_data(self):
-        logger.info("start to refresh data...")
+        logging.info("start to refresh data...")
         new_data = kms_to_json()
         with self._data_lock:
             self._info = new_data
-        logger.info("refreshing data is completed!")
+        logging.info("refreshing data is completed!")
 
 
 def run_as_service(host="0.0.0.0", port=8080):
-    global logger
-    logger = logging.getLogger("soliddriver-checks-service")
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s : %(name)s : %(levelname)s : %(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-    
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
     interval = os.getenv("REFRESH_INTERVAL")
     interval = interval if interval is not None else 1
-    logger.info("refresh interval: %s hour(s)" % interval)
-    
+    logging.info("refresh interval: %s hour(s)" % interval)
+
     global kms
     kms = KMInfo(interval)
 
