@@ -49,13 +49,14 @@ def run_as_service(host="0.0.0.0", port=8080):
     global kms
     kms = KMInfo(interval)
 
-    run(host=host, port=port)
+    run(host=host, port=port, quiet=True)
 
 
 @get('/kms_info')
 def kms_info():
     response.content_type = 'application/json'
     info = kms.data
+    logging.info("GET /kms_info HTTP/1.1")
 
     return info
 
