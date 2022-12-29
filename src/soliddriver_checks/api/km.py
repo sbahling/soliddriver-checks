@@ -4,6 +4,7 @@ import json
 from ..config import SDCConf
 from enum import Enum, unique
 from .utils.cmd import run_cmd
+import requests
 
 
 @unique
@@ -61,8 +62,8 @@ class KMAnalysis:
         if not filename.startswith("/lib/modules"):
             lev = KMEvaluation.WARNING
 
-        if wu != 0: # under weak-updates folder, and have issues.
-            if wu == 2 or wu == 3: # kernel module does not exist or not a link
+        if wu != 0:  # under weak-updates folder, and have issues.
+            if wu == 2 or wu == 3:  # kernel module does not exist or not a link
                 lev = KMEvaluation.ERROR
 
         return lev, filename
@@ -103,7 +104,7 @@ class KMAnalysis:
         return KMEvaluation.PASS, running
 
     def _km_kmp_analysis(self, kmp):
-        if None == kmp:
+        if kmp is None:
             return KMEvaluation.PASS, {"name": "", "signature": ""} 
 
         name = kmp["name"]
@@ -159,19 +160,19 @@ class KMReader:
         # so if you want to match the KMP search index with the modinfo output index, you have to
         # take care of above. This is what I am doing.
         kmp_index = 0
-        for km_info in kms_info[1:]: # first one is empty.
+        for km_info in kms_info[1:]:  # first one is empty.
             lines = km_info.splitlines()
             info = {}
             filename = lines[0].strip()
-            for line in lines[1:]: # first line is filename, and filename is the key for info.
+            for line in lines[1:]:  # first line is filename, and filename is the key for info.
                 vs = line.split(":")
                 k, v = vs[0].strip(), ":".join(vs[1:]).strip()
-                if "modinfo" == k: # invalid kernel module found
-                    if "not found." in v: # invalid kernel module link found
+                if "modinfo" == k:  # invalid kernel module found
+                    if "not found." in v:  # invalid kernel module link found
                         file = files[kmp_index]  # the full file path only can be found in files. The orders are the same.
                         kmps[file]["rpm"] = {"name": kmps[kmp_index], "signature": ""}
                         kmp_index += 1
-                elif None != info.get(k, None): # if already exist
+                elif info.get(k, None) is not None:  # if already exist
                     info[k] = info[k] + "\n" + v
                 else:
                     info[k] = v
@@ -211,3 +212,10 @@ class KMReader:
             kmp_sig_pairs[uniq_kmps[i]] = signatures[i].split(":")[1:]
 
         return kmp_sig_pairs
+
+
+def read_remote_json(url):
+    response = requests.get(url)
+    df = pd.read_json(response.text)
+
+    return df

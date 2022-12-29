@@ -1,8 +1,8 @@
 import click
 import json
 from ..api import analysis
-from .terminal_logs import KMPTerminalOutput
-from ..api.utils.remote_analysis import check_remote_servers
+from ..api.km import read_remote_json
+from .terminal_logs import KMPTerminalOutput, single_kmp_output
 from .kmp_report import KMPReporter
 from .km_report import KMReporter
 import os
@@ -12,12 +12,12 @@ from pathlib import Path
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from ..version import __VERSION__
+from urllib.parse import urlparse
 
 
 FORMAT_TYPES = {
     "html": ".html",
     "xlsx": ".xlsx",
-    "pdf": ".pdf",
     "json": ".json",
 }
 
@@ -27,34 +27,46 @@ class Check_Target:
         if target is None:
             target = "system"
 
-        self.target = Path(target)
+        self._target = target
 
     @property
     def system(self):
-        return self.target.name == "system" and not (
-            self.target.is_file() or self.target.is_dir()
+        target = Path(self._target)
+        return target.name == "system" and not (
+            target.is_file() or target.is_dir()
         )
 
     @property
     def rpm(self):
         # need better check than this
-        if self.target.is_file() and self.target.name.endswith(".rpm"):
-            return self.target
+        target = Path(self._target)
+        if target.is_file() and target.name.endswith(".rpm"):
+            return target
         return None
 
     @property
     def dir(self):
-        if self.target.is_dir():
-            return self.target
+        target = Path(self._target)
+        if target.is_dir():
+            return target
         return None
 
     @property
-    def config(self):
+    def url(self):
         try:
-            with self.target.open() as f:
-                return json.load(f)
-        except Exception as e:
-            raise (e)
+            self._url = urlparse(self._target)
+            if all([self._url.scheme, self._url.netloc]):
+                return self._target
+
+            return None
+        except:
+            return None
+
+    @property
+    def url_host(self):
+        if self.url is not None:
+            return self._url.hostname
+        return None
 
 
 def with_format_suffix(path, format_type):
@@ -69,7 +81,7 @@ def with_format_suffix(path, format_type):
     return path.parent / (path.name + suffix)
 
 
-def export(exporter, check_result, out_format, dst):
+def kmp_export(exporter, check_result, out_format, dst):
     dst = with_format_suffix(dst, out_format)
     if out_format == "html":
         exporter.to_html(check_result, dst)
@@ -77,6 +89,16 @@ def export(exporter, check_result, out_format, dst):
         exporter.to_xlsx(check_result, dst)
     elif out_format == "json":
         exporter.to_json(check_result, dst)
+
+
+def km_export(exporter, label, check_result, out_format, dst):
+    dst = with_format_suffix(dst, out_format)
+    if out_format == "html":
+        exporter.to_html(label, check_result, dst)
+    elif out_format == "xlsx":
+        exporter.to_xlsx(label, check_result, dst)
+    elif out_format == "json":
+        exporter.to_json(label, check_result, dst)
 
 
 def dst_is_ok(dst, out_format):
@@ -134,10 +156,6 @@ def run(check_target, output, out_format, version):
       KMP file
       directory containing KMP files
       "system" to check locally installed kernel modules
-      a config file listing remote systems to check (Please
-      ensure your remote systems are scp command accessable)
-
-      default is local system
     """
 
     if version:
@@ -165,15 +183,8 @@ def run(check_target, output, out_format, version):
         out_format = ext_to_format.get(dst.suffix, None)
 
     if target.rpm:
-        progress = Progress(
-            "{task.description}",
-            SpinnerColumn(),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        )
-        with progress:
-            rpm_check = terminal_logs.KMPProcessor(terminal_logs.KMPTerminalOutput(progress))
-            check_result = rpm_check.process_kmp(target.rpm)
+        df = analysis.kmp_analysis(target.rpm)
+        single_kmp_output(df)
 
     elif target.dir:
         progress = Progress(
@@ -186,7 +197,7 @@ def run(check_target, output, out_format, version):
             log = KMPTerminalOutput(progress)
             df = analysis.kmps_to_dataframe(target.dir, log)
         reporter = KMPReporter()
-        export(reporter, df, out_format, dst)
+        kmp_export(reporter, df, out_format, dst)
         logger.info(
             "[green]Check is completed![/]"
             "The result has been saved to "
@@ -205,19 +216,11 @@ def run(check_target, output, out_format, version):
         label = "%s (%s)" % (hostname, ip)
         logger.info("Retrieving kernel module data for %s" % label)
         reporter = KMReporter()
-        export(reporter, label, out_format, dst)
-
-    elif target.config is not None:
-        servers = target.config["servers"]
-        check_result = check_remote_servers(logger, servers)
-        exporter = data_exporter.DriversExporter()
-        export(exporter, check_result, out_format, dst)
-        logger.info(
-            "[green]Check is completed[/]"
-            "Please see the results in [bold green]%s[/]" % dst.parent,
-            extra={"markup": True},
-        )
-
+        km_export(reporter, label, None, out_format, dst)
+    elif target.url:
+        df = read_remote_json(target.url)
+        reporter = KMReporter()
+        km_export(reporter, target.url_host, df, out_format, dst)
 
 if __name__ == "__main__":
     run()

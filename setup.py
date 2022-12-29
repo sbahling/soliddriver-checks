@@ -51,7 +51,8 @@ setup(
         'openpyxl>=3.0.10',
         'pandas>=1.5.2',
         'rich>=12.6.0',
-        'setuptools>=65.4.1'
+        'setuptools>=65.4.1',
+        'requests>=2.28.1'
     ],
     entry_points={
         'console_scripts': [

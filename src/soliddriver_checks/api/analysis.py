@@ -23,6 +23,15 @@ def kmps_to_dataframe(path, proc_injector=None):
     return analysis_kmps_to_dataframe(data)
 
 
+def kmp_analysis(kmp_path):
+    reader = KMPReader()
+    anls = KMPAnalysis()
+
+    raw_info = reader.collect_kmp_data(kmp_path)
+
+    return analysis_kmps_to_dataframe([anls.kmp_analysis(raw_info)])
+
+
 def kmps_to_json(path, proc_injector=None):
     df = kmps_to_dataframe(path, proc_injector)
 
@@ -36,11 +45,8 @@ def kms_to_dataframe():
     return anls.kms_analysis(reader.get_all_modinfo())
 
 
-def kms_to_json():
-    df = kms_to_dataframe()
+def kms_to_json(df=None):
+    if df is None:
+        df = kms_to_dataframe()
 
     return df.to_json(orient="records")
-
-
-def remote_km_to_json(remote_info):
-    pass
