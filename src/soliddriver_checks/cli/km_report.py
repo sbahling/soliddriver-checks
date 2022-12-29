@@ -41,13 +41,13 @@ class KMReporter:
 
         return [
             "",  # level style, no need for this.
-            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["Module Name"]["level"])),
-            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["File"]["level"])),
-            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["License"]["level"])),
-            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["Signature"]["level"])),
-            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row['"supported" Flag']["level"])),
-            "", # running style, no need for this.
-            _get_cell_style(KMEvaluation(row["level"]), KMEvaluation(row["KMP"]["level"]))
+            _get_cell_style(KMEvaluation(row["level"]["value"]), KMEvaluation(row["Module Name"]["level"]["value"])),
+            _get_cell_style(KMEvaluation(row["level"]["value"]), KMEvaluation(row["File"]["level"]["value"])),
+            _get_cell_style(KMEvaluation(row["level"]["value"]), KMEvaluation(row["License"]["level"]["value"])),
+            _get_cell_style(KMEvaluation(row["level"]["value"]), KMEvaluation(row["Signature"]["level"]["value"])),
+            _get_cell_style(KMEvaluation(row["level"]["value"]), KMEvaluation(row['"supported" Flag']["level"]["value"])),
+            "",  # running style, no need for this.
+            _get_cell_style(KMEvaluation(row["level"]["value"]), KMEvaluation(row["KMP"]["level"]["value"]))
         ]
 
     def _format_columns(self, df):
@@ -63,7 +63,7 @@ class KMReporter:
             }
         )
 
-    def to_html(self, sys_info, file):
+    def to_html(self, sys_info, df_format, file):
         pkg_path = os.path.dirname(__file__)
         jinja_tmpl = f"{pkg_path}/../config/templates"
         file_loader = FileSystemLoader(jinja_tmpl)
@@ -71,9 +71,11 @@ class KMReporter:
 
         km_tmpl = env.get_template("km-report.html.jinja")
 
-        df_format = kms_to_dataframe()
+        if df_format is None:
+            df_format = kms_to_dataframe()  # read from local system.
+
         kms_in_total = len(df_format.index)
-        failed_kms_in_total = len([f for f in df_format["level"].to_list() if KMEvaluation(f) != KMEvaluation.PASS])
+        failed_kms_in_total = len([f for f in df_format["level"].to_list() if KMEvaluation(f['value']) != KMEvaluation.PASS])
         
         df_format = self._format_columns(df_format)
         ts = df_format.style.hide(axis="index").hide([('level')], axis="columns").set_table_attributes('class="table_center"').apply(self._row_style_in_html, axis=1).format(self._format_cell)
@@ -97,11 +99,11 @@ class KMReporter:
 
         with open(file, "w") as f:
             f.write(kms_buffer)
-    
+
     def _create_xlsx_overview(self, ws):
         et = XlsxTemplate()
         et.set_km_overview(ws)
-        
+
     def _create_xlsx_sheet(self, wb, sys_info, df):
         ws = wb.create_sheet(sys_info)
 
@@ -146,18 +148,20 @@ class KMReporter:
         
         render.set_column_width(ws, {'A': 25, 'B': 90, 'C':18, 'D':10, 'E':15, 'F': 10, 'G': 30})
 
-    def to_xlsx(self, sys_info, file):
+    def to_xlsx(self, sys_info, df_format, file):
         wb = Workbook()
         self._create_xlsx_overview(wb.active)
-        
-        df = kms_to_dataframe()
-        self._create_xlsx_sheet(wb, sys_info, df)
+
+        if df_format is None:
+            df_format = kms_to_dataframe()
+
+        self._create_xlsx_sheet(wb, sys_info, df_format)
 
         wb.save(file)
-    
-    def to_json(self, sys_info, file):
-        buffer = kms_to_json()
-        
-        #TODO: add sys_info to json output.
+
+    def to_json(self, sys_info, df_format, file):
+        buffer = kms_to_json(df_format)
+
+        # TODO: add sys_info to json output.
         with open(file, "w") as fp:
             json.dump(json.loads(buffer), fp)
