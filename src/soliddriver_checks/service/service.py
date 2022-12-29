@@ -34,7 +34,7 @@ class KMInfo:
         new_data = kms_to_json()
         with self._data_lock:
             self._info = new_data
-        logging.info("refreshing data is completed!")
+        logging.info("data refreshing is completed!")
 
 
 def run_as_service(host="0.0.0.0", port=8080):
