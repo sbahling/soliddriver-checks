@@ -9,10 +9,11 @@ from ..config import SDCConf, get_version, generate_timestamp
 from ..api.kmp import KMPEvaluation
 from .xlsx_utils import XlsxTemplate, KMPXlsxStyler
 
+
 class KMPReporter:
     def __init__(self):
         self._style = SDCConf()
-    
+
     def _summary(self, df):
         summary = df.copy()
         for i, row in summary.iterrows(): # we need to do this for unique() since unhashable type: 'dict'.
@@ -22,7 +23,7 @@ class KMPReporter:
             counter = 0
             for v in col:
                 if v.get("level") != KMPEvaluation.PASS:
-                    counter+=1
+                    counter += 1
             return counter
 
         def format_cell(number, total):
