@@ -7,9 +7,7 @@ class KMPTerminalOutput:
 
     def prepartion(self, kmps):
         self._task = self._progress.add_task(
-            "[italic][bold][green] Checking RPMs "
-            + "; Total RPMs: "
-            + str(len(kmps)),
+            "[italic][bold][green] Checking RPMs " + "; Total RPMs: " + str(len(kmps)),
             total=len(kmps),
         )
 
@@ -22,7 +20,7 @@ class KMPTerminalOutput:
 
 
 def single_kmp_output(df):
-    pd.set_option('expand_frame_repr', False)
-    pd.set_option('display.max_columns', 999)
+    pd.set_option("expand_frame_repr", False)
+    pd.set_option("display.max_columns", 999)
 
     print(df)
