@@ -32,9 +32,9 @@ class KMReporter:
             imp_bgcolor = impstyle["background-color"]
             # imp_border = impstyle["border"]
 
-            if KMEvaluation.WARNING == cell_level:
+            if int(KMEvaluation.WARNING) == cell_level:
                 style = f"background-color:{imp_bgcolor}"
-            elif KMEvaluation.ERROR == cell_level:
+            elif int(KMEvaluation.ERROR) == cell_level:
                 style = f"background-color:{cri_bgcolor} color:{cri_color}"
 
             return style
@@ -75,15 +75,15 @@ class KMReporter:
             df_format = kms_to_dataframe()  # read from local system.
 
         kms_in_total = len(df_format.index)
-        failed_kms_in_total = len([f for f in df_format["level"].to_list() if KMEvaluation(f['value']) != KMEvaluation.PASS])
-        
+        failed_kms_in_total = len([f for f in df_format["level"].to_list() if f['value'] != int(KMEvaluation.PASS)])
+
         df_format = self._format_columns(df_format)
         ts = df_format.style.hide(axis="index").hide([('level')], axis="columns").set_table_attributes('class="table_center"').apply(self._row_style_in_html, axis=1).format(self._format_cell)
-        
+
         # df["running"].loc[df.running == True] = "&#9989;"
         # df["running"].loc[df.running == False] = "&#9940;"
         # df["running"].loc[df.running == ""] = "N/A"
-        
+
         # Will be easier to get the value if run this after reformat the values.
         external_kms_in_total = len([sf for sf in df_format['"supported" Flag'].to_list() if sf == "external"])
 
@@ -115,13 +115,13 @@ class KMReporter:
         df_values = df_values.astype(str)
         for row in dataframe_to_rows(df_values, index=False, header=True):
             ws.append(row)
-            
+
         # format table
         render = KMXlsxStyler()
         # format header
         for cell in ws[1]:
             render.set_header(cell)
-        
+
         # format data
         pair = {'A' : "modulename",
         'B' : "filename",
@@ -138,15 +138,21 @@ class KMReporter:
             row_level = df.at[i-data_start_row, 'level']
             for cell in ws[i]:
                 v = df.at[i-data_start_row, pair[cell.column_letter]]
-                lev = v.get('level', KMEvaluation.PASS)
-                if lev == KMEvaluation.PASS:
+                lev = v.get('level')
+                if lev['value'] == int(KMEvaluation.PASS):
                     render.normal(cell)
-                elif lev == KMEvaluation.WARNING:
+                elif lev['value'] == int(KMEvaluation.WARNING):
                     render.warning(cell)
-                elif lev == KMEvaluation.ERROR:
+                elif lev['value'] == int(KMEvaluation.ERROR):
                     render.error(cell)
-        
-        render.set_column_width(ws, {'A': 25, 'B': 90, 'C':18, 'D':10, 'E':15, 'F': 10, 'G': 30})
+
+        render.set_column_width(ws, {'A': 25,
+                                     'B': 90,
+                                     'C': 18,
+                                     'D': 10,
+                                     'E': 15,
+                                     'F': 10,
+                                     'G': 30})
 
     def to_xlsx(self, sys_info, df_format, file):
         wb = Workbook()

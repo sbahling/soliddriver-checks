@@ -13,6 +13,15 @@ class KMEvaluation (Enum):
     WARNING = 2
     ERROR = 3
 
+    def __str__(self):
+        return self.name
+
+    def __int__(self):
+        return self.value
+
+    def to_json(self):
+        return {'level': self.name, 'value': self.value}
+
 
 class KMAnalysis:
     def __init__(self):
@@ -25,22 +34,22 @@ class KMAnalysis:
         df = pd.DataFrame()
         for filename in kms:
             lev_name, name = self._km_module_name_analysis(kms[filename].get("name", ""))
-            row_level.append(lev_name.value)
+            row_level.append(lev_name['value'])
             lev_fn, filename = self._km_filename_analysis(filename, kms[filename].get("weak-updates", 0))
-            row_level.append(lev_fn.value)
+            row_level.append(lev_fn['value'])
             lev_spd, supported = self._km_supported_analysis(kms[filename].get("supported", ""))
-            row_level.append(lev_spd.value)
+            row_level.append(lev_spd['value'])
             lev_lic, license = self._km_license_analysis(kms[filename].get("license", ""))
-            row_level.append(lev_lic.value)
+            row_level.append(lev_lic['value'])
             lev_sig, signature = self._km_signature_analysis(kms[filename].get("signature", ""))
-            row_level.append(lev_sig.value)
+            row_level.append(lev_sig['value'])
             lev_r, running = self._km_running_analysis(kms[filename].get("running", ""))
-            row_level.append(lev_r.value)
+            row_level.append(lev_r['value'])
             lev_kmp, kmp = self._km_kmp_analysis(kms[filename].get("kmp", None))
-            row_level.append(lev_kmp.value)
+            row_level.append(lev_kmp['value'])
 
             row = pd.Series({
-                             "level": KMEvaluation(max(row_level)),
+                             "level": KMEvaluation(max(row_level)).to_json(),
                              "modulename": {"level": lev_name, "value": name},
                              "filename": {"level": lev_fn, "value": filename},
                              "license": {"level": lev_lic, "value": license},
@@ -55,7 +64,7 @@ class KMAnalysis:
         return df
 
     def _km_module_name_analysis(self, name):
-        return KMEvaluation.PASS, name
+        return KMEvaluation.PASS.to_json(), name
 
     def _km_filename_analysis(self, filename, wu):
         lev = KMEvaluation.PASS
@@ -66,7 +75,7 @@ class KMAnalysis:
             if wu == 2 or wu == 3:  # kernel module does not exist or not a link
                 lev = KMEvaluation.ERROR
 
-        return lev, filename
+        return lev.to_json(), filename
 
     def _km_supported_analysis(self, supported):
         sps = supported.splitlines()
@@ -81,7 +90,7 @@ class KMAnalysis:
                     lev = KMEvaluation.ERROR
                     break
 
-        return lev, sps
+        return lev.to_json(), sps
 
     def _km_license_analysis(self, license):
         lev = KMEvaluation.PASS
@@ -92,30 +101,30 @@ class KMAnalysis:
                 lev = KMEvaluation.WARNING
                 break
 
-        return lev, license
+        return lev.to_json(), license
 
     def _km_signature_analysis(self, signature):
         if signature != "":
-            return KMEvaluation.PASS, "Yes"
+            return KMEvaluation.PASS.to_json(), "Yes"
         else:
-            return KMEvaluation.WARNING, "No"
+            return KMEvaluation.WARNING.to_json(), "No"
 
     def _km_running_analysis(self, running):
-        return KMEvaluation.PASS, running
+        return KMEvaluation.PASS.to_json(), running
 
     def _km_kmp_analysis(self, kmp):
         if kmp is None:
-            return KMEvaluation.PASS, {"name": "", "signature": ""} 
+            return KMEvaluation.PASS.to_json(), {"name": "", "signature": ""} 
 
         name = kmp["name"]
         signature = kmp["signature"]
 
         if name.endswith("is not owned by any package"):
-            return KMEvaluation.WARNING, "Not owned by any package"
+            return KMEvaluation.WARNING.to_json(), "Not owned by any package"
         elif signature == "":
-            return KMEvaluation.WARNING, name + ": has no signature"
+            return KMEvaluation.WARNING.to_json(), name + ": has no signature"
 
-        return KMEvaluation.PASS, name + " signature found"
+        return KMEvaluation.PASS.to_json(), name
 
 
 class KMReader:

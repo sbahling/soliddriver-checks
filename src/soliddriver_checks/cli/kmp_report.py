@@ -16,13 +16,14 @@ class KMPReporter:
 
     def _summary(self, df):
         summary = df.copy()
-        for i, row in summary.iterrows(): # we need to do this for unique() since unhashable type: 'dict'.
+        for i, row in summary.iterrows():  # we need to do this for unique() since unhashable type: 'dict'.
             row["vendor"] = row["vendor"]["value"]
 
         def failed_len(col):
             counter = 0
             for v in col:
-                if v.get("level") != KMPEvaluation.PASS:
+                eval = v.get("level")
+                if eval['value'] != int(KMPEvaluation.PASS):
                     counter += 1
             return counter
 
@@ -57,7 +58,7 @@ class KMPReporter:
             })
 
             sum_table = pd.concat([sum_table, new_row.to_frame().T], ignore_index=True)
-        
+
         return sum_table
 
     def _summary_to_html(self, df):
@@ -73,10 +74,10 @@ class KMPReporter:
                         t.set_attribute("class", "summary_vendor")
                     else:
                         th(col)
-            
+
             def _pass(item):
                 return int(item.split(" ")[0]) == 0
-            
+
             for __, row in summary.iterrows():
                 vendor = row["Vendor"]
                 total = row["Total KMPs"]
@@ -88,7 +89,7 @@ class KMPReporter:
                 km_license = row["KM Licenses"]
                 symbols = row["Symbols"]
                 alias = row["Modalias"]
-                
+
                 row_passed = False
                 if (
                     vendor != ""
@@ -158,14 +159,14 @@ class KMPReporter:
     def _detail_to_html(self, df):
         def _create_cell(ana_val):
             level, value = ana_val.get("level"), ana_val.get("value")
-            if value == None:
+            if value is None:
                 value = ""
 
-            if level == KMPEvaluation.PASS:
+            if level['value'] == int(KMPEvaluation.PASS):
                 return td(value)
-            elif level == KMPEvaluation.WARNING:
+            elif level['value'] == int(KMPEvaluation.WARNING):
                 return td(value).set_attribute("class", "important_failed")
-            elif level == KMPEvaluation.ERROR:
+            elif level['value'] == int(KMPEvaluation.ERROR):
                 return td(value).set_attribute("class", "critical_failed")
 
         tb = table()
@@ -189,11 +190,11 @@ class KMPReporter:
 
             for __, row in df.iterrows():
                 with tr() as r:
-                    if row["level"] == KMPEvaluation.WARNING:
+                    if row["level"]['value'] == int(KMPEvaluation.WARNING):
                         r.set_attribute("class", "important_failed_row")
-                    elif row["level"] == KMPEvaluation.ERROR:
+                    elif row["level"]['value'] == int(KMPEvaluation.ERROR):
                         r.set_attribute("class", "critical_failed_row")
-                
+
                     _create_cell(row["name"])
                     _create_cell(row["path"])
                     _create_cell(row["vendor"])
@@ -205,9 +206,9 @@ class KMPReporter:
                     _create_cell(row["supported_flag"])
                     _create_cell(row["symbols"])
                     _create_cell(row["modalias"])
-        
+
         return tb
-    
+
     def to_html(self, df, file):
         pkg_path = os.path.dirname(__file__)
         jinja_tmpl = f"{pkg_path}/../config/templates"
@@ -223,7 +224,7 @@ class KMPReporter:
 
         with open(file, "w") as f:
             f.write(kmp_checks)
-    
+
     def _create_xlsx_overview(self, ws):
         et = XlsxTemplate()
         et.set_kmp_overview(ws)
@@ -232,7 +233,7 @@ class KMPReporter:
         ws = wb.create_sheet("Vendor Summary")
         for row in dataframe_to_rows(df, index=False, header=True):
             ws.append(row)
-        
+
         render = KMPXlsxStyler()
         render.render_summary(ws)
 
@@ -246,16 +247,16 @@ class KMPReporter:
         df_values = df_values.astype(str)
         for row in dataframe_to_rows(df_values, index=False, header=False):
             ws.append(row)
-        
+
         ws.insert_rows(1, amount=2)
-        
+
         render = KMPXlsxStyler()
         # create header
         def set_header(pairs):
             for loc in pairs:
                 ws[loc] = pairs[loc]
                 render.set_header(ws[loc])
-        
+
         set_header({
             'A1': 'KMP Checks',
             'G1': 'Kernel Module Checks',
@@ -273,7 +274,7 @@ class KMPReporter:
         })
         ws.merge_cells('A1:F1')
         ws.merge_cells('G1:K1')
-        
+
         pair = {'A' : "name",
         'B' : "path",
         'C' : "vendor",
@@ -286,7 +287,7 @@ class KMPReporter:
         'J' : "symbols",
         'K' : "modalias",
         }
-        
+
         data_start_row = 3
         row_count = len(df.index) + data_start_row
         for i in range(data_start_row, row_count):
@@ -294,26 +295,35 @@ class KMPReporter:
             row_level = df.at[i-data_start_row, 'level']
             for cell in ws[i]:
                 v = df.at[i-data_start_row, pair[cell.column_letter]]
-                lev = v.get('level', KMPEvaluation.PASS)
-                if lev == KMPEvaluation.PASS:
+                lev = v.get('level')
+                if lev['value'] == int(KMPEvaluation.PASS):
                     render.normal(cell)
-                elif lev == KMPEvaluation.WARNING:
+                elif lev['value'] == int(KMPEvaluation.WARNING):
                     render.warning(cell)
-                elif lev == KMPEvaluation.ERROR:
+                elif lev['value'] == int(KMPEvaluation.ERROR):
                     render.error(cell)
-        
-        render.set_column_width(ws, {'A': 25, 'B': 90, 'C':18, 'D':30, 'E':15, 'F': 10, 'G': 20, 'H': 10, 'I': 30, 'J': 60, 'K': 40})
+
+        render.set_column_width(ws, {'A': 25,
+                                     'B': 90,
+                                     'C': 18,
+                                     'D': 30,
+                                     'E': 15,
+                                     'F': 10,
+                                     'G': 20,
+                                     'H': 10,
+                                     'I': 30,
+                                     'J': 60,
+                                     'K': 40})
 
     def to_xlsx(self, df, file):
         wb = Workbook()
         self._create_xlsx_overview(wb.active)
-        
+
         sum_table = self._summary(df)
         self._summary_to_xlsx(wb, sum_table)
         self._detail_to_xlsx(wb, df)
-        
+
         wb.save(file)
-    
+
     def to_json(self, df, file):
         df.to_json(file, orient="records")
-
