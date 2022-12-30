@@ -32,9 +32,7 @@ class Check_Target:
     @property
     def system(self):
         target = Path(self._target)
-        return target.name == "system" and not (
-            target.is_file() or target.is_dir()
-        )
+        return target.name == "system" and not (target.is_file() or target.is_dir())
 
     @property
     def rpm(self):
@@ -221,6 +219,7 @@ def run(check_target, output, out_format, version):
         df = read_remote_json(target.url)
         reporter = KMReporter()
         km_export(reporter, target.url_host, df, out_format, dst)
+
 
 if __name__ == "__main__":
     run()

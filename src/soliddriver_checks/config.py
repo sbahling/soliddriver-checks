@@ -40,8 +40,7 @@ class SDCConf:
             color=conf["font"]["color"],
         )
         sd = Side(
-            border_style=conf["side"]["border_style"],
-            color=conf["side"]["color"]
+            border_style=conf["side"]["border_style"], color=conf["side"]["color"]
         )
         bd = Border(top=sd, left=sd, right=sd, bottom=sd)
         fill = PatternFill(
@@ -62,14 +61,10 @@ class SDCConf:
         return self._get_xlsx_info("kmp", "xlsx", "table", "data", "normal")
 
     def get_kmp_warning(self):
-        return self._get_xlsx_info(
-            "kmp", "xlsx", "table", "data", "warning"
-        )
+        return self._get_xlsx_info("kmp", "xlsx", "table", "data", "warning")
 
     def get_kmp_error(self):
-        return self._get_xlsx_info(
-            "kmp", "xlsx", "table", "data", "error"
-        )
+        return self._get_xlsx_info("kmp", "xlsx", "table", "data", "error")
 
     def get_kmp_row_pass(self):
         return self._get_xlsx_info("kmp", "xlsx", "table", "row", "pass")
@@ -84,14 +79,10 @@ class SDCConf:
         return self._get_xlsx_info("km", "xlsx", "table", "data", "normal")
 
     def get_km_warning(self):
-        return self._get_xlsx_info(
-            "km", "xlsx", "table", "data", "warning"
-        )
+        return self._get_xlsx_info("km", "xlsx", "table", "data", "warning")
 
     def get_km_error(self):
-        return self._get_xlsx_info(
-            "km", "xlsx", "table", "data", "error"
-        )
+        return self._get_xlsx_info("km", "xlsx", "table", "data", "error")
 
     def get_km_warn_row(self):
         return self._get_xlsx_info("km", "xlsx", "table", "row", "warn")
@@ -130,4 +121,4 @@ class xlsxTemplate:
 
         ws["A5"].value = get_version()
         ws["A6"].value = generate_timestamp()
-        ws.column_dimensions['A'].width = 200
+        ws.column_dimensions["A"].width = 200

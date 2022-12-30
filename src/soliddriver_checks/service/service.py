@@ -39,7 +39,9 @@ class KMInfo:
 
 
 def run_as_service(host="0.0.0.0", port=8080):
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s : %(levelname)s : %(message)s", level=logging.INFO
+    )
     logging.info("soliddriver-checks-service version: %s" % __VERSION__)
 
     interval = os.getenv("REFRESH_INTERVAL")
@@ -52,9 +54,9 @@ def run_as_service(host="0.0.0.0", port=8080):
     run(host=host, port=port, quiet=True)
 
 
-@get('/kms_info')
+@get("/kms_info")
 def kms_info():
-    response.content_type = 'application/json'
+    response.content_type = "application/json"
     info = kms.data
     logging.info("GET /kms_info HTTP/1.1")
 

@@ -25,12 +25,14 @@ def kmps_to_dataframe(path, proc_injector=None):
 def kmps_to_json(path, proc_injector=None):
     pass
 
+
 def km_to_dataframe(proc_injector=None):
     pass
+
 
 def km_to_json():
     pass
 
+
 def remote_km_to_json(remote_info, proc_injector=None):
     pass
-

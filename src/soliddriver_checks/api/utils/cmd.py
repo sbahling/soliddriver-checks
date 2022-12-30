@@ -4,6 +4,7 @@ import subprocess
 def get_max_args():
     return int(run_cmd("getconf ARG_MAX"))
 
+
 def async_run_cmd(
     cmd, line_handler, line_handler_arg, start, end, condition, sshClient=None
 ):
@@ -53,4 +54,3 @@ def run_cmd(cmd, sshClient=None, timeout=None):
         )
         result, __ = cmd_runner.communicate()
         return str(result, "utf-8")
-    
