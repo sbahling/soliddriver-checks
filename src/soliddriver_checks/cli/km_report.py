@@ -81,7 +81,7 @@ class KMReporter:
             }
         )
 
-    def to_html(self, sys_info, df_format, file):
+    def to_html(self, sys_info, df_format, filter, file):
         pkg_path = os.path.dirname(__file__)
         jinja_tmpl = f"{pkg_path}/../config/templates"
         file_loader = FileSystemLoader(jinja_tmpl)
@@ -90,7 +90,7 @@ class KMReporter:
         km_tmpl = env.get_template("km-report.html.jinja")
 
         if df_format is None:
-            df_format = kms_to_dataframe()  # read from local system.
+            df_format = kms_to_dataframe(filter)  # read from local system.
 
         kms_in_total = len(df_format.index)
         failed_kms_in_total = len(
@@ -184,18 +184,18 @@ class KMReporter:
             ws, {"A": 25, "B": 90, "C": 18, "D": 10, "E": 15, "F": 10, "G": 30}
         )
 
-    def to_xlsx(self, sys_info, df_format, file):
+    def to_xlsx(self, sys_info, df_format, filter, file):
         wb = Workbook()
         self._create_xlsx_overview(wb.active)
 
         if df_format is None:
-            df_format = kms_to_dataframe()
+            df_format = kms_to_dataframe(filter)
 
         self._create_xlsx_sheet(wb, sys_info, df_format)
 
         wb.save(file)
 
-    def to_json(self, sys_info, df_format, file):
+    def to_json(self, sys_info, df_format, filter, file):
         buffer = kms_to_json(df_format)
 
         # TODO: add sys_info to json output.
