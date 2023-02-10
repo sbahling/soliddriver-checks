@@ -224,10 +224,10 @@ class KM_filter:
                 df = KM_filter._equal(oper[1], oper[2], self.data)
                 proc_lst.append(df)
             elif oper[0] == "ne":
-                df = KM_filter._equal(oper[1], oper[2], self.data)
+                df = KM_filter._ne(oper[1], oper[2], self.data)
                 proc_lst.append(df)
             elif oper[0] == "match":
-                df = KM_filter._equal(oper[1], oper[2], self.data)
+                df = KM_filter._match(oper[1], oper[2], self.data)
                 proc_lst.append(df)
             elif oper[0] == "no":
                 df = KM_filter._no(oper[1], self.data)
