@@ -116,7 +116,7 @@ class KM_filter:
         return []
 
     def _filter(field, oper, value, by_level=False, by_row_level=False):
-        if by_row_level == "level":
+        if by_row_level:
             field = field["level"]
         elif by_level:
             field = field["level"]["level"]
@@ -152,7 +152,7 @@ class KM_filter:
             str, bool, bool: field, check field level, check row level.
         """
         if field.endswith(".level"):
-            field = field[:len(".level")]
+            field = field[:len(".level")-1]
             if field == "level":
                 return field, True, True
             else:
