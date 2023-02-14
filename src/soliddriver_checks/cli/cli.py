@@ -89,14 +89,14 @@ def kmp_export(exporter, check_result, out_format, dst):
         exporter.to_json(check_result, dst)
 
 
-def km_export(exporter, label, check_result, out_format, dst):
+def km_export(exporter, label, check_result, filter, out_format, dst):
     dst = with_format_suffix(dst, out_format)
     if out_format == "html":
-        exporter.to_html(label, check_result, dst)
+        exporter.to_html(label, check_result, filter, dst)
     elif out_format == "xlsx":
-        exporter.to_xlsx(label, check_result, dst)
+        exporter.to_xlsx(label, check_result, filter, dst)
     elif out_format == "json":
-        exporter.to_json(label, check_result, dst)
+        exporter.to_json(label, check_result, filter, dst)
 
 
 def dst_is_ok(dst, out_format):
@@ -130,7 +130,13 @@ def dst_is_ok(dst, out_format):
     "out_format",
     type=click.Choice(FORMAT_TYPES),
     default="json",
-    help="Specify output format (PDF is in Beta)",
+    help="Specify output format",
+)
+@click.option(
+    "--filter",
+    "-i",
+    default="",
+    help="Filter kernel module to report (Beta)",
 )
 @click.option(
     "--output",
@@ -146,7 +152,7 @@ def dst_is_ok(dst, out_format):
     "be automatically appended matching on the output format",
 )
 @click.option("--version", is_flag=True)
-def run(check_target, output, out_format, version):
+def run(check_target, output, out_format, filter, version):
     """Run checks against CHECK_TARGET.
 
     \b
@@ -214,11 +220,11 @@ def run(check_target, output, out_format, version):
         label = "%s (%s)" % (hostname, ip)
         logger.info("Retrieving kernel module data for %s" % label)
         reporter = KMReporter()
-        km_export(reporter, label, None, out_format, dst)
+        km_export(reporter, label, None, filter, out_format, dst)
     elif target.url:
         df = read_remote_json(target.url)
         reporter = KMReporter()
-        km_export(reporter, target.url_host, df, out_format, dst)
+        km_export(reporter, target.url_host, df, filter, out_format, dst)
 
 
 if __name__ == "__main__":

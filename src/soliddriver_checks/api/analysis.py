@@ -1,5 +1,6 @@
 from .kmp import KMPReader, KMPAnalysis, analysis_kmps_to_dataframe
 from .km import KMReader, KMAnalysis
+from .filter import km_filter
 
 
 def kmps_to_dataframe(path, proc_injector=None):
@@ -38,15 +39,22 @@ def kmps_to_json(path, proc_injector=None):
     return df.to_json(orient="records")
 
 
-def kms_to_dataframe():
+def kms_to_dataframe(filter=None):
     reader = KMReader()
     anls = KMAnalysis()
+    df = anls.kms_analysis(reader.get_all_modinfo())
 
-    return anls.kms_analysis(reader.get_all_modinfo())
+    if filter is None:
+        return df
+    else:
+        return km_filter(filter, df)
 
 
-def kms_to_json(df=None):
+def kms_to_json(df=None, filter=None):
     if df is None:
         df = kms_to_dataframe()
 
-    return df.to_json(orient="records")
+    if filter is None:
+        return df.to_json(orient="records")
+    else:
+        return km_filter(filter, df).to_json(orient="records")

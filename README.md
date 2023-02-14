@@ -1,33 +1,27 @@
 # soliddriver-checks
 
-A tool for ```KMP(Kernel Module Package)``` and ```installed/running kernel module``` checking, with this tool, users can have an overview of their KMP(s) and kernel modules status:
+```soliddriver-checks is``` A tool for ```KMP(Kernel Module Package)``` and ```installed/running kernel module``` checking, with this tool, users can have an report of their KMP(s) and KM status (the report can be formatted in ```html```, ```excel``` and ```json```), the tool can be run as command line tool or service:
 
-- KMP (Kernel Module Package)
-  - ```Name```: Name of the KMP </br>
-  - ```Path```: Path of the KMP’s location </br>
-  - ```Vendor```: Who provides this KMP, considered as important issue if there’s no vendor information. </br>
-  - ```Signature```: Signature of the KMP, considered as important issue if no signature. </br>
-  - ```License```: License followed by the KMP, considered as critical issue if it’s not open sourced license. </br>
-  - ```Weak Module Invoked```: The KMP should invoke weak-modules script to determines which modules are KAPI compatible with installed kernels and set up the symlinks. Otherwise it will be considered as critical issue. </br>
-- Kernel Module
-  - ```Supported Flag```/```Signature```: All the kernel module should have “supported” flag and assigned “external” value to it, otherwise it’s not be supported by SUSE. And all the kernel module should have signature.If the value of “supported” flag is not “external”, or no “supported” flag or no signature, will be considered as critical issue.  </br>
-    - The values of the flag respensent:
-      - ```yes```: This kernel module is supported by SUSE. But please confirm with SUSE if you're not sure if it's really supported by SUSE or the auther of the kernel module just put a ```yes``` on it.
-      - ```external```: This kernel module is supported by both vendor and SUSE.
-      - ```Missing or no```: The kernel module is not supported by SUSE, please contact the one who provide it to you for any issues. </br>
-  - ```Symbols```: All the symbols in kernel module should be recorded in KMP, otherwise considered as critical issue. </br>
+##### Note: This tool only check the KMP and KM are built meet SUSE’s requirement, don’t look into the code perspective. So any bugs or security related issues inside the kernel module can not be found.
 
-## What you can do with this report generaged by soliddriver-checks?
+- KM: kernel module
+- KMP: kernel module package
 
-Regarding the issues listed in the table, please contact your IHV(s) to fix it and follow  [Kernel Module Packages Manual](https://drivers.suse.com/doc/kmpm/) to build SUSE standard KMP.
+## Installation:
+- pypi: ```pip install soliddriver-checks```
+- zypper: the rpms can be found on [build.opensuse.org](https://build.opensuse.org/package/show/home:huizhizhao:soliddriver-checks/soliddriver-checks)
 
-## Installation
+## How should you address the issues?
+You should contact your IHVs to rebuild the KMP for you to meet the requirement of SUSE, and ask them to to follow the [Kernel Module Packages Manual](https://drivers.suse.com/doc/kmpm/) or contact SUSE directly if they don’t know how to do it.
+- Highlight in yellow: Warning, this is not necessary but have potential issue, like no signature, not GPL compatible license and etc.
+- Highlight in red: Error, could cause issue during the installation, after kernel upgrade or during the kernel module is running and etc.
 
-From pypi: ```pip install soliddriver-checks```
+### KMP Report:
+- “Summary of the result from vendor perspective”: Summarize the number of check failure. 
+- “Check result in details”: Show the detail of every KMP been checked by this tool.
 
-From RPM: the rpms can be found on [build.opensuse.org](https://build.opensuse.org/package/show/home:huizhizhao:soliddriver-checks/soliddriver-checks)
-
-## Usage
+### KM Report:
+- Show the detail of every kernel module is running or founded under ```“/lib/modules”```.
 
 ```
 Usage: soliddriver-checks [OPTIONS] [CHECK_TARGET]
@@ -35,41 +29,63 @@ Usage: soliddriver-checks [OPTIONS] [CHECK_TARGET]
   Run checks against CHECK_TARGET.
 
   CHECK_TARGET can be:
-    directory containing rpm files
+    KMP file
+    directory containing KMP files
     "system" to check locally installed kernel modules
-    a config file listing remote systems to check (Please
-    ensure your remote systems are scp command accessable)
-
-    default is local system
 
 Options:
-  -f, --format [json|html|xlsx]
-  				  Specify output format, default is html,all
-				  data can be saved in json format, html|xlsx 
-          are optimized for better view. The
-                                  default output is $(pwd)/check_result.json
-
-  -o, --output TEXT               Output destination. Target can be filename
-                                  or point existing directory If directory,
-                                  files will be placed in the directory using
-                                  a autmatically generated filename. If target
-                                  is not an existing directory, file name is
-                                  assumed and output files will use the path
-                                  and file name specified. In either case, the
-                                  file extension will be automatically
-                                  appended matching on the output format
+  -f, --format [html|xlsx|json]  Specify output format
+  -i, --filter TEXT              Filter kernel module to report (Beta)
+  -o, --output TEXT              Output destination. Target can be filename or
+                                 point existing directory If directory, files
+                                 will be placed in the directory using a
+                                 autmatically generated filename. If target is
+                                 not an existing directory, file name is
+                                 assumed and output files will use the path
+                                 and file name specified. In either case, the
+                                 file extension will be automatically appended
+                                 matching on the output format
+  --version
+  --help                         Show this message and exit.
 ```
 
-## Examples:
- - Check RPMs: </br>
-   ```bash
-   # generate a html report for your rpm checks as default output.
-   soliddriver-checks /path/to/your/rpm/directory
-   ```
+filter (only works in kernel module check):
+“key” [ = | != | match | no ] “value”</br>
+and | or</br>
+( )</br>
+EBNF grammer can be found in filter.py
+- All the ```“key”``` can be found in the json file generated by this tool, they are:</br>
+```[ modulename | filename | license | signature | supported | running | kmp ]```
 
- - Check all drivers on the system.
-    ```bash
-    # generate reports with html, excel, pdf format of your os.
-    soliddriver-checks
-    ```
+  - modulename -> Name of the kernel module
+  - filename   -> File path
+  - license.   -> License
+  - signature  -> Signature
+  - supported  -> Value of “supported” flag
+  - running    -> Running status (True | False)
+  - kmp        -> Installed by which KMP
+
+- match: match only take the python regex pattern.
+
+  - Search by evaluation of ```soliddirver-checks```:</br>
+ ```“key.level” [ = | != ] “PASS” | “WARNING” | “ERROR”```
+  - If you want to search by row evaluation, the ```“key”``` should be ```“level.level”```:</br>
+ ```“level.level” [ = | != ] “PASS” | “WARNING” | “ERROR”```
+
+#### Examples:
+- Check KMPs under a directory, and generated a HTML report:</br>
+    ```soliddriver-checks /path/to/kmps -f html -o [report-name].html```
+- Check current system’s KM, and generated a excel report:</br>
+    ```soliddriver-checks -f xlsx -o [report-name].xlsx```
+- Run soliddirver-checks as service:</br>
+    ```export REFRESH_INTERVAL=12 # data will be refreshed every 12 hours.```
+    ```soliddriver-checks-service```
+- Generate report from remote (make sure you have the server running remotely), and generated a HTML report:</br>
+    ```soliddriver-checks http://remote-ip:8080/kms_info -f html -o [report-name].html```
+- Generate a kernel module report only contain which are not meet SUSE requirement:</br>
+    ```soliddriver-checks -f html -o [report-name].html -i ‘“level.level” != “PASS”’```
+
+
+
+
 
