@@ -195,8 +195,8 @@ class KMPAnalysis:
             "license": self._kmp_km_ana_summary(km_analysis, "license"),
             "supported": self._kmp_km_ana_summary(km_analysis, "supported"),
             "signature": self._kmp_km_ana_summary(km_analysis, "signature"),
-            "symbols": {"level": eval, "value": alaias_msg},
-            "alias": self._kmp_km_ana_summary(km_analysis, "symbols"),
+            "symbols": self._kmp_km_ana_summary(km_analysis, "symbols"),
+            "alias": {"level": eval, "value": alaias_msg},
         }
 
         return KMPEvaluation(max(ana_level)).to_json(), ana_summary
