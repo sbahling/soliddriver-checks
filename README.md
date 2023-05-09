@@ -1,6 +1,6 @@
 # soliddriver-checks
 
-```soliddriver-checks is``` A tool for ```KMP(Kernel Module Package)``` and ```installed/running kernel module``` checking, with this tool, users can have an report of their KMP(s) and KM status (the report can be formatted in ```html```, ```excel``` and ```json```), the tool can be run as command line tool or service:
+```soliddriver-checks is``` a tool for ```KMP(Kernel Module Package)``` and ```installed/running kernel module``` checking, with this tool, users can have an report of their KMP(s) and KM status (the report can be formatted in ```html```, ```excel``` and ```json```), the tool can be run as command line tool or service:
 
 ##### Note: This tool only check the KMP and KM are built meet SUSE’s requirement, don’t look into the code perspective. So any bugs or security related issues inside the kernel module can not be found.
 
