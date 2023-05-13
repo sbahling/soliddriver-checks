@@ -315,11 +315,11 @@ class KMPReader:
         km_info = self._get_km_all_info(path)
 
         return {
-            "name": base_info.get("Name"),
+            "name": base_info.get("Name", ""),
             "path": path,
-            "vendor": base_info.get("Vendor"),
-            "signature": base_info.get("Signature"),
-            "license": base_info.get("License"),
+            "vendor": base_info.get("Vendor", ""),
+            "signature": base_info.get("Signature", ""),
+            "license": base_info.get("License", ""),
             "wm2_invoked": wm2_invoked,
             "reqs": reqs,
             "modalias": modalias,
