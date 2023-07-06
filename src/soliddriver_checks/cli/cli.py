@@ -199,7 +199,7 @@ def run(check_target, output, out_format, filter, version):
         )
         with progress:
             log = KMPTerminalOutput(progress)
-            df = analysis.kmps_to_dataframe(target.dir, log)
+            df = analysis.kmps_to_dataframe(target.dir, log, filter)
         reporter = KMPReporter()
         kmp_export(reporter, df, out_format, dst)
         logger.info(
