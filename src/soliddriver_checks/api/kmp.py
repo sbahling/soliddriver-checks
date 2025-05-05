@@ -260,8 +260,7 @@ class KMPAnalysis:
                         if uk.strip() == kmp_a.strip():
                             unmatched_kmp_alias.remove(uk)
                             break
-                # Keep looping. Can match more than one KMP modalias
-                # Need to remove all from unmatched list.
+                    break
             if not found:
                 unmatched_ker_alias.append(ker_a)
 
