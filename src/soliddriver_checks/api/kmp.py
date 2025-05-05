@@ -453,6 +453,9 @@ class KMPReader:
         for line in lines:
             if "/usr/lib/module-init-tools/weak-modules2" in line:
                 return True
+            # Newer KMP scripts call kernel-scriptlets
+            if "module-init-tools/kernel-scriptlets/kmp-post" in line:
+                return True
 
         return False
 
